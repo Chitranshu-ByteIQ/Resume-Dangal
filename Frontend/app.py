@@ -1,58 +1,82 @@
+import os
+from typing import Any
+
+import pandas as pd
 import requests
 import streamlit as st
 
 
-# ==========================================================
-# Configuration
-# ==========================================================
+# ============================================================
+# CONFIG
+# ============================================================
 
-API_URL = "http://127.0.0.1:8000"
+API_URL = os.getenv(
+    "BACKEND_URL",
+    "http://127.0.0.1:8000",
+)
+
+REQUEST_TIMEOUT = 120
 
 
-# ==========================================================
-# Page Config
-# ==========================================================
+# ============================================================
+# PAGE
+# ============================================================
 
 st.set_page_config(
     page_title="Resume Dangal",
-    page_icon="📄",
+    page_icon="🏆",
     layout="wide",
+    initial_sidebar_state="expanded",
 )
 
 
-# ==========================================================
-# Custom CSS
-# ==========================================================
+# ============================================================
+# CSS
+# ============================================================
 
 st.markdown(
     """
     <style>
 
-    .main {
+    .block-container {
+        max-width: 1450px;
         padding-top: 2rem;
+        padding-bottom: 3rem;
     }
 
-    .resume-header {
-        padding: 1rem 0 2rem 0;
-    }
-
-    .resume-title {
-        font-size: 3rem;
+    .app-title {
+        font-size: 42px;
         font-weight: 800;
-        margin-bottom: 0.2rem;
+        margin-bottom: 0;
     }
 
-    .resume-subtitle {
-        color: #777;
-        font-size: 1.1rem;
+    .app-subtitle {
+        font-size: 16px;
+        opacity: 0.65;
+        margin-bottom: 25px;
     }
 
-    .resume-card {
-        padding: 1.2rem;
-        border: 1px solid #e5e7eb;
-        border-radius: 12px;
-        margin-bottom: 1rem;
-        background-color: white;
+    .metric-card {
+        padding: 20px;
+        border-radius: 14px;
+        border: 1px solid rgba(128,128,128,0.25);
+        text-align: center;
+    }
+
+    .metric-value {
+        font-size: 32px;
+        font-weight: 800;
+    }
+
+    .metric-label {
+        font-size: 13px;
+        opacity: 0.65;
+    }
+
+    .section-title {
+        font-size: 22px;
+        font-weight: 700;
+        margin-bottom: 10px;
     }
 
     </style>
@@ -61,232 +85,764 @@ st.markdown(
 )
 
 
-# ==========================================================
-# Header
-# ==========================================================
+# ============================================================
+# API HELPERS
+# ============================================================
 
-st.markdown(
-    """
-    <div class="resume-header">
-        <div class="resume-title">
-            Resume Dangal
-        </div>
+def api_get(
+    endpoint: str,
+    timeout: int = 20,
+):
 
-        <div class="resume-subtitle">
-            AI-powered resume ranking and candidate intelligence
-        </div>
-    </div>
-    """,
-    unsafe_allow_html=True,
+    try:
+
+        response = requests.get(
+            f"{API_URL}{endpoint}",
+            timeout=timeout,
+        )
+
+        return response
+
+    except requests.RequestException as error:
+
+        st.error(
+            f"Backend connection failed: {error}"
+        )
+
+        return None
+
+
+def api_post(
+    endpoint: str,
+    **kwargs,
+):
+
+    try:
+
+        return requests.post(
+            f"{API_URL}{endpoint}",
+            timeout=REQUEST_TIMEOUT,
+            **kwargs,
+        )
+
+    except requests.RequestException as error:
+
+        st.error(
+            f"Backend connection failed: {error}"
+        )
+
+        return None
+
+
+def api_delete(
+    endpoint: str,
+):
+
+    try:
+
+        return requests.delete(
+            f"{API_URL}{endpoint}",
+            timeout=30,
+        )
+
+    except requests.RequestException as error:
+
+        st.error(
+            f"Backend connection failed: {error}"
+        )
+
+        return None
+
+
+# ============================================================
+# LOAD RESUMES
+# ============================================================
+
+@st.cache_data(
+    ttl=10,
+    show_spinner=False,
 )
+def get_resumes():
 
-
-# ==========================================================
-# Sidebar
-# ==========================================================
-
-with st.sidebar:
-
-    st.header("Resume Manager")
-
-    st.caption(
-        "Upload candidate resumes to Resume Dangal."
+    response = api_get(
+        "/api/resumes"
     )
 
-    st.divider()
+    if response is None:
+        return []
 
-    if st.button(
-        "🔄 Refresh Resumes",
-        use_container_width=True,
-    ):
-        st.rerun()
+    if response.status_code != 200:
 
+        return []
 
-# ==========================================================
-# Upload Section
-# ==========================================================
-
-st.subheader("Upload Resume")
-
-uploaded_file = st.file_uploader(
-    "Choose a PDF resume",
-    type=["pdf"],
-    accept_multiple_files=False,
-)
-
-
-if uploaded_file:
-
-    st.write(
-        f"Selected: **{uploaded_file.name}**"
-    )
-
-    if st.button(
-        "Upload Resume",
-        type="primary",
-        use_container_width=True,
-    ):
-
-        files = {
-            "file": (
-                uploaded_file.name,
-                uploaded_file.getvalue(),
-                "application/pdf",
-            )
-        }
-
-        try:
-
-            response = requests.post(
-                f"{API_URL}/api/resumes/upload",
-                files=files,
-                timeout=60,
-            )
-
-            if response.status_code == 201:
-
-                data = response.json()
-
-                st.success(
-                    "Resume uploaded successfully."
-                )
-
-                st.json(data)
-
-                st.rerun()
-
-            else:
-
-                try:
-                    error = response.json()
-                except Exception:
-                    error = response.text
-
-                st.error(
-                    f"Upload failed: {error}"
-                )
-
-        except requests.RequestException as error:
-
-            st.error(
-                f"Backend connection failed: {error}"
-            )
-
-
-# ==========================================================
-# Resume List
-# ==========================================================
-
-st.divider()
-
-st.subheader("Stored Resumes")
-
-
-try:
-
-    response = requests.get(
-        f"{API_URL}/api/resumes",
-        timeout=30,
-    )
-
-    if response.status_code == 200:
+    try:
 
         data = response.json()
 
-        resumes = data.get(
+        return data.get(
             "resumes",
             [],
         )
 
-        if not resumes:
+    except Exception:
 
-            st.info(
-                "No resumes stored yet."
+        return []
+
+
+# ============================================================
+# HEADER
+# ============================================================
+
+header_left, header_right = st.columns(
+    [5, 1]
+)
+
+with header_left:
+
+    st.markdown(
+        '<div class="app-title">🏆 Resume Dangal</div>',
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        '<div class="app-subtitle">'
+        "AI-powered resume ranking and candidate intelligence"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+
+with header_right:
+
+    if st.button(
+        "🔄 Refresh",
+        use_container_width=True,
+    ):
+
+        get_resumes.clear()
+
+        st.rerun()
+
+
+# ============================================================
+# BACKEND STATUS
+# ============================================================
+
+health_response = api_get(
+    "/health",
+    timeout=5,
+)
+
+if health_response is not None:
+
+    if health_response.status_code == 200:
+
+        st.success(
+            "● Backend connected",
+            icon="✅",
+        )
+
+    else:
+
+        st.warning(
+            "Backend is degraded."
+        )
+
+else:
+
+    st.error(
+        "Backend unavailable."
+    )
+
+
+# ============================================================
+# LOAD RESUMES
+# ============================================================
+
+resumes = get_resumes()
+
+
+# ============================================================
+# TOP METRICS
+# ============================================================
+
+m1, m2, m3 = st.columns(3)
+
+
+with m1:
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-value">
+                {len(resumes)}
+            </div>
+            <div class="metric-label">
+                Stored Resumes
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+with m2:
+
+    selected_count = len(
+        st.session_state.get(
+            "selected_resume_ids",
+            [],
+        )
+    )
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-value">
+                {selected_count}
+            </div>
+            <div class="metric-label">
+                Selected Candidates
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+with m3:
+
+    st.markdown(
+        f"""
+        <div class="metric-card">
+            <div class="metric-value">
+                {API_URL}
+            </div>
+            <div class="metric-label">
+                API Endpoint
+            </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+st.divider()
+
+
+# ============================================================
+# MAIN LAYOUT
+# ============================================================
+
+left, center, right = st.columns(
+    [1.3, 3.4, 1.8],
+    gap="large",
+)
+
+
+# ============================================================
+# LEFT - UPLOAD
+# ============================================================
+
+with left:
+
+    st.markdown(
+        '<div class="section-title">📤 Upload Resume</div>',
+        unsafe_allow_html=True,
+    )
+
+    uploaded_file = st.file_uploader(
+        "Upload PDF",
+        type=["pdf"],
+        accept_multiple_files=False,
+    )
+
+    if uploaded_file:
+
+        st.info(
+            f"📄 {uploaded_file.name}"
+        )
+
+        st.caption(
+            f"{uploaded_file.size / 1024:.1f} KB"
+        )
+
+        if st.button(
+            "Upload Resume",
+            type="primary",
+            use_container_width=True,
+        ):
+
+            files = {
+                "file": (
+                    uploaded_file.name,
+                    uploaded_file.getvalue(),
+                    "application/pdf",
+                )
+            }
+
+            with st.spinner(
+                "Uploading resume..."
+            ):
+
+                response = api_post(
+                    "/api/resumes/upload",
+                    files=files,
+                )
+
+            if response is not None:
+
+                if response.status_code == 201:
+
+                    st.success(
+                        "Resume uploaded."
+                    )
+
+                    get_resumes.clear()
+
+                    st.rerun()
+
+                else:
+
+                    try:
+                        detail = response.json().get(
+                            "detail",
+                            response.text,
+                        )
+                    except Exception:
+                        detail = response.text
+
+                    st.error(
+                        f"Upload failed: {detail}"
+                    )
+
+
+# ============================================================
+# CENTER - JOB DESCRIPTION
+# ============================================================
+
+with center:
+
+    st.markdown(
+        '<div class="section-title">🎯 Job Description</div>',
+        unsafe_allow_html=True,
+    )
+
+    job_description = st.text_area(
+        "Job Description",
+        height=260,
+        placeholder=(
+            "Paste the complete job description here...\n\n"
+            "Example:\n"
+            "We are looking for an AI Engineer..."
+        ),
+        label_visibility="collapsed",
+    )
+
+    st.caption(
+        "The JD is used by the LangGraph ranking engine."
+    )
+
+
+# ============================================================
+# RIGHT - RESUME SELECTION
+# ============================================================
+
+with right:
+
+    st.markdown(
+        '<div class="section-title">📋 Resume Library</div>',
+        unsafe_allow_html=True,
+    )
+
+    if not resumes:
+
+        st.info(
+            "No resumes uploaded yet."
+        )
+
+    else:
+
+        # ----------------------------------------------------
+        # Create lookup
+        # ----------------------------------------------------
+
+        resume_lookup = {
+            resume["resume_id"]: resume
+            for resume in resumes
+        }
+
+        resume_options = {
+            resume["resume_id"]: (
+                f"{resume['filename']} "
+                f"({resume['size'] / 1024:.1f} KB)"
+            )
+            for resume in resumes
+        }
+
+        existing_selection = [
+            resume_id
+            for resume_id in st.session_state.get(
+                "selected_resume_ids",
+                [],
+            )
+            if resume_id in resume_lookup
+        ]
+
+        selected_resume_ids = st.multiselect(
+            "Select candidates",
+            options=list(
+                resume_options.keys()
+            ),
+            default=existing_selection,
+            format_func=lambda resume_id:
+                resume_options[resume_id],
+        )
+
+        st.session_state[
+            "selected_resume_ids"
+        ] = selected_resume_ids
+
+        st.caption(
+            f"{len(selected_resume_ids)} resume(s) selected"
+        )
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # Selected resumes
+        # ----------------------------------------------------
+
+        for resume_id in selected_resume_ids:
+
+            resume = resume_lookup[
+                resume_id
+            ]
+
+            st.markdown(
+                f"**📄 {resume['filename']}**"
+            )
+
+        st.divider()
+
+        # ----------------------------------------------------
+        # Delete
+        # ----------------------------------------------------
+
+        st.markdown(
+            "**Delete Resume**"
+        )
+
+        delete_options = {
+            resume["resume_id"]: resume["filename"]
+            for resume in resumes
+        }
+
+        delete_id = st.selectbox(
+            "Resume",
+            options=list(
+                delete_options.keys()
+            ),
+            format_func=lambda resume_id:
+                delete_options[resume_id],
+            label_visibility="collapsed",
+        )
+
+        if st.button(
+            "🗑️ Delete",
+            use_container_width=True,
+        ):
+
+            response = api_delete(
+                f"/api/resumes/{delete_id}"
+            )
+
+            if response is not None:
+
+                if response.status_code == 200:
+
+                    st.success(
+                        "Resume deleted."
+                    )
+
+                    st.session_state[
+                        "selected_resume_ids"
+                    ] = [
+                        x
+                        for x in selected_resume_ids
+                        if x != delete_id
+                    ]
+
+                    get_resumes.clear()
+
+                    st.rerun()
+
+                else:
+
+                    st.error(
+                        "Failed to delete resume."
+                    )
+
+
+# ============================================================
+# RANKING
+# ============================================================
+
+st.divider()
+
+st.markdown(
+    '<div class="section-title">🏆 Resume Ranking</div>',
+    unsafe_allow_html=True,
+)
+
+
+selected_resume_ids = st.session_state.get(
+    "selected_resume_ids",
+    [],
+)
+
+
+rank_disabled = (
+    not job_description.strip()
+    or not selected_resume_ids
+)
+
+
+if rank_disabled:
+
+    if not job_description.strip():
+
+        st.info(
+            "Enter a job description first."
+        )
+
+    elif not selected_resume_ids:
+
+        st.info(
+            "Select at least one resume from the Resume Library."
+        )
+
+
+if st.button(
+    "🚀 Rank Selected Resumes",
+    type="primary",
+    use_container_width=True,
+    disabled=rank_disabled,
+):
+
+    payload = {
+        "job_description": job_description,
+        "resume_ids": selected_resume_ids,
+    }
+
+    with st.spinner(
+        "Analyzing resumes and ranking candidates..."
+    ):
+
+        response = api_post(
+            "/api/ranking",
+            json=payload,
+        )
+
+    if response is not None:
+
+        if response.status_code == 200:
+
+            data = response.json()
+
+            st.session_state[
+                "ranking_results"
+            ] = data.get(
+                "results",
+                [],
+            )
+
+            st.success(
+                f"Ranked {data.get('total_resumes', 0)} resumes."
             )
 
         else:
 
-            st.caption(
-                f"{len(resumes)} resume(s) stored"
+            try:
+
+                detail = response.json().get(
+                    "detail",
+                    response.text,
+                )
+
+            except Exception:
+
+                detail = response.text
+
+            st.error(
+                f"Ranking failed: {detail}"
             )
 
-            for resume in resumes:
 
-                with st.container(
-                    border=True
-                ):
+# ============================================================
+# RESULTS
+# ============================================================
 
-                    col1, col2, col3 = st.columns(
-                        [5, 2, 1]
-                    )
+results = st.session_state.get(
+    "ranking_results",
+    [],
+)
 
-                    with col1:
 
-                        st.markdown(
-                            f"### 📄 {resume['filename']}"
-                        )
+if results:
 
-                        st.caption(
-                            f"S3 Key: `{resume['s3_key']}`"
-                        )
+    st.divider()
 
-                    with col2:
+    st.markdown(
+        '<div class="section-title">📊 Ranking Results</div>',
+        unsafe_allow_html=True,
+    )
 
-                        size_kb = (
-                            resume["size"]
-                            / 1024
-                        )
+    df = pd.DataFrame(
+        results
+    )
 
-                        st.metric(
-                            "Size",
-                            f"{size_kb:.1f} KB",
-                        )
+    # --------------------------------------------------------
+    # Main ranking table
+    # --------------------------------------------------------
 
-                    with col3:
+    preferred_columns = [
+        "Rank",
+        "Candidate Name",
+        "Final Score",
+        "Recommendation",
+        "Skill Score",
+        "Project Score",
+        "Experience Score",
+        "Education Score",
+    ]
 
-                        delete_clicked = st.button(
-                            "🗑️",
-                            key=f"delete_{resume['s3_key']}",
-                            help="Delete resume",
-                        )
+    visible_columns = [
+        column
+        for column in preferred_columns
+        if column in df.columns
+    ]
 
-                        if delete_clicked:
+    if visible_columns:
 
-                            delete_response = requests.delete(
-                                f"{API_URL}/api/resumes",
-                                params={
-                                    "s3_key": resume[
-                                        "s3_key"
-                                    ]
-                                },
-                                timeout=30,
-                            )
-
-                            if (
-                                delete_response.status_code
-                                == 200
-                            ):
-
-                                st.success(
-                                    "Resume deleted."
-                                )
-
-                                st.rerun()
-
-                            else:
-
-                                st.error(
-                                    "Failed to delete resume."
-                                )
+        st.dataframe(
+            df[visible_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
 
     else:
 
-        st.error(
-            "Unable to retrieve resumes."
+        st.dataframe(
+            df,
+            use_container_width=True,
+            hide_index=True,
         )
 
-except requests.RequestException:
+    # --------------------------------------------------------
+    # Candidate details
+    # --------------------------------------------------------
 
-    st.warning(
-        "FastAPI backend is not running."
+    st.subheader(
+        "Candidate Details"
     )
+
+    for _, row in df.iterrows():
+
+        candidate_name = row.get(
+            "Candidate Name",
+            "Unknown",
+        )
+
+        score = row.get(
+            "Final Score",
+            0,
+        )
+
+        recommendation = row.get(
+            "Recommendation",
+            "Unknown",
+        )
+
+        with st.expander(
+            f"#{row.get('Rank', '')} "
+            f"{candidate_name} — "
+            f"{score}% — "
+            f"{recommendation}"
+        ):
+
+            c1, c2, c3, c4 = st.columns(4)
+
+            with c1:
+                st.metric(
+                    "Skills",
+                    row.get(
+                        "Skill Score",
+                        0,
+                    ),
+                )
+
+            with c2:
+                st.metric(
+                    "Projects",
+                    row.get(
+                        "Project Score",
+                        0,
+                    ),
+                )
+
+            with c3:
+                st.metric(
+                    "Experience",
+                    row.get(
+                        "Experience Score",
+                        0,
+                    ),
+                )
+
+            with c4:
+                st.metric(
+                    "Education",
+                    row.get(
+                        "Education Score",
+                        0,
+                    ),
+                )
+
+            matched = row.get(
+                "Matched Skills",
+                [],
+            )
+
+            if isinstance(
+                matched,
+                list,
+            ):
+
+                st.write(
+                    "**Matched Skills:**",
+                    ", ".join(matched)
+                    if matched
+                    else "None",
+                )
+
+            else:
+
+                st.write(
+                    f"**Matched Skills:** {matched}"
+                )
+
+            reason = row.get(
+                "Reason",
+                "",
+            )
+
+            if reason:
+
+                st.write(
+                    "**Reason:**"
+                )
+
+                st.write(
+                    reason
+                )
