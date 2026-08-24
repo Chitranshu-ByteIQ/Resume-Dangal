@@ -1,15 +1,16 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 class JobDescription(BaseModel):
     """
-    Structured representation of a Job Description.
-
-    This schema is stored as JSON in S3 and later
-    used by the ranking engine.
+    Structured representation of a Job Description
+    extracted from raw JD text.
     """
 
-    job_id: str
+    job_id: str = Field(
+        ...,
+        description="Unique job identifier",
+    )
 
     title: str = Field(
         ...,
@@ -30,20 +31,45 @@ class JobDescription(BaseModel):
     experience_required: float | None = Field(
         default=None,
         ge=0,
-        description="Required experience in years",
+        description="Required professional experience in years",
     )
 
     responsibilities: list[str] = Field(
         default_factory=list,
-        description="Key responsibilities",
+        description="Major responsibilities of the role",
     )
 
     education: list[str] = Field(
         default_factory=list,
-        description="Required or preferred education",
+        description="Required or preferred educational qualifications",
     )
 
     description: str | None = Field(
         default=None,
         description="Original or summarized job description",
     )
+
+    @field_validator(
+        "required_skills",
+        "preferred_skills",
+        "responsibilities",
+        "education",
+        mode="before",
+    )
+    @classmethod
+    def normalize_lists(cls, value):
+        """
+        Normalize extracted list fields.
+        """
+
+        if value is None:
+            return []
+
+        if isinstance(value, str):
+            return [value.strip()] if value.strip() else []
+
+        return [
+            str(item).strip()
+            for item in value
+            if str(item).strip()
+        ]

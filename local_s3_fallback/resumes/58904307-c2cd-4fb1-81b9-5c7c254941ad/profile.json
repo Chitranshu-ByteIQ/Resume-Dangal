@@ -1,0 +1,77 @@
+{
+  "candidate_id": "58904307-c2cd-4fb1-81b9-5c7c254941ad",
+  "name": "CHITRANSHU SANKET",
+  "email": "sinhachitranshu40@gmail.com",
+  "phone": "+91 7088153650",
+  "location": "Bhubaneswar, Odisha",
+  "suitable_title": "AI Engineer",
+  "experience_years": 0.5,
+  "education": [
+    "Bachelor of Technology in Computer Science & Engineering (Data Science), Gandhi Institute of Engineering and Technology, Gunupur, Odisha, Expected April 2027, CGPA: 7.11/10"
+  ],
+  "tech_stack": [
+    "Python",
+    "C++",
+    "JavaScript",
+    "SQL",
+    "R",
+    "AWS",
+    "Azure",
+    "Scikit-learn",
+    "PyTorch",
+    "TensorFlow",
+    "YOLO",
+    "Hugging Face Transformers",
+    "LangChain",
+    "LangGraph",
+    "LangSmith",
+    "RAG",
+    "MCP",
+    "LoRA",
+    "Fine-tuning",
+    "MySQL",
+    "PostgreSQL",
+    "MongoDB",
+    "Supabase",
+    "Chroma",
+    "Pinecone",
+    "FastAPI",
+    "Docker",
+    "MLflow",
+    "PySpark",
+    "Apache Airflow",
+    "Git",
+    "GitHub",
+    "Bash",
+    "Shell",
+    "Excel",
+    "OpenCV",
+    "TrOCR"
+  ],
+  "soft_skills": [
+    "Leadership",
+    "Mentoring"
+  ],
+  "projects": [
+    "Ask-HR – Python, LangGraph, FastAPI, LangChain, ChromaDB, Human-in-the-Loop: Agentic HR assistant with RAG and human-in-the-loop workflow.",
+    "Type 2 Diabetes Prediction & Root Cause Analysis (ML + XAI) – Python, Scikit-learn, SHAP/LIME: End-to-end ML pipeline on 27K+ patient records, achieving 92.7% accuracy.",
+    "GirlScript Summer of Code (GSSoC) – Nyay Setu: Modular Modi Script OCR pipeline using FastAPI, OpenCV, Hugging Face TrOCR, and PyTorch."
+  ],
+  "work_experience": [
+    "AI Engineering Intern – Bisy Group (Remote/Hyderabad), May 2025 – Nov 2025: Built and deployed a RAG-based AI assistant using FastAPI, LangChain, and LangGraph; developed LLM-powered workflows; created scalable automation solutions using FastAPI, Azure Blob Storage, and PySpark."
+  ],
+  "certifications": [
+    "Intro to Data Science (Cisco)",
+    "ML for Data Science (IBM)",
+    "Generative AI (Databricks)",
+    "OCI AI Foundation",
+    "OCI Data Science Professional (Oracle)",
+    "R Language",
+    "C++ Programming",
+    "Deep Learning (NPTEL)",
+    "RAG (MongoDB)",
+    "Project Management (Udemy)"
+  ],
+  "profile_summary": "Computer Science & Engineering undergraduate specializing in Data Science, with hands-on experience building machine learning and Generative AI applications. Worked on RAG-based systems, LLM workflows, and AI automation pipelines using Python, FastAPI, LangChain, and PyTorch. Currently expanding expertise in MLOps and scalable AI system design through open-source projects and internship experience.",
+  "resume_file": "resumes/58904307-c2cd-4fb1-81b9-5c7c254941ad/original.pdf"
+}

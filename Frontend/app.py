@@ -1,227 +1,857 @@
-import os
 import requests
 import streamlit as st
 
-BACKEND_URL = os.getenv("BACKEND_URL", "http://127.0.0.1:8000")
 
-# Page Setup
+# ============================================================
+# Configuration
+# ============================================================
+
+API_URL = "http://localhost:8000"
+
+
+# ============================================================
+# Page configuration
+# ============================================================
+
 st.set_page_config(
     page_title="Resume Dangal",
-    page_icon="📄",
+    page_icon="🎯",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
 
-if "theme" not in st.session_state:
-    st.session_state.theme = "Light"
-
 
 # ============================================================
-# Dynamic CSS Injection
+# CSS
 # ============================================================
-def apply_theme_css():
-    if st.session_state.theme == "Dark":
-        bg_color, card_bg, border_color, text_color, text_muted, input_bg = (
-            "#0E1117",
-            "#161B22",
-            "#30363D",
-            "#C9D1D9",
-            "#8B949E",
-            "#0D1117",
-        )
-    else:
-        bg_color, card_bg, border_color, text_color, text_muted, input_bg = (
-            "#FFFFFF",
-            "#F8F9FA",
-            "#E9ECEF",
-            "#212529",
-            "#6C757D",
-            "#FFFFFF",
-        )
 
-    css = f"""
-    <style>
-    [data-testid="stHeader"] {{ display: none; }}
-    .block-container {{ padding-top: 1.5rem; padding-bottom: 1rem; max-width: 1400px; }}
-    .stApp {{ background-color: {bg_color}; color: {text_color}; }}
-    .app-title {{ font-size: 38px; font-weight: 800; margin-bottom: 2px; color: {text_color}; }}
-    .app-subtitle {{ font-size: 15px; color: {text_muted}; margin-bottom: 15px; }}
-    .content-card {{ background-color: {card_bg}; border: 1px solid {border_color}; border-radius: 10px; padding: 16px; margin-bottom: 16px; }}
-    .resume-count {{ font-size: 36px; font-weight: 800; text-align: center; color: {text_color}; margin: 5px 0; }}
-    .resume-item {{ padding: 8px 0; border-bottom: 1px solid {border_color}; font-size: 13px; color: {text_color}; }}
-    .stTextArea textarea, .stTextInput input {{ background-color: {input_bg} !important; color: {text_color} !important; border: 1px solid {border_color} !important; }}
-    </style>
+st.markdown(
     """
-    st.markdown(css, unsafe_allow_html=True)
+    <style>
 
+    .block-container {
+        max-width: 1400px;
+        padding-top: 2rem;
+        padding-bottom: 3rem;
+    }
 
-apply_theme_css()
+    .main-title {
+        text-align: center;
+        font-size: 42px;
+        font-weight: 800;
+        margin-bottom: 0.2rem;
+    }
+
+    .subtitle {
+        text-align: center;
+        color: #777;
+        margin-bottom: 2rem;
+    }
+
+    .section-title {
+        font-size: 25px;
+        font-weight: 700;
+        margin-top: 1rem;
+        margin-bottom: 1rem;
+    }
+
+    .score {
+        font-size: 32px;
+        font-weight: 800;
+    }
+
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 # ============================================================
-# API Service Helpers
+# Session state
 # ============================================================
-def fetch_resumes():
+
+if "candidates" not in st.session_state:
+    st.session_state.candidates = []
+
+if "job" not in st.session_state:
+    st.session_state.job = None
+
+if "rankings" not in st.session_state:
+    st.session_state.rankings = None
+
+
+# ============================================================
+# Helper
+# ============================================================
+
+
+def api_error(response):
     try:
-        res = requests.get(f"{BACKEND_URL}/resumes", timeout=5)
-        return res.json() if res.status_code == 200 else []
-    except requests.exceptions.RequestException:
-        st.error("Failed to connect to backend service.")
-        return []
+        data = response.json()
+
+        if isinstance(data, dict):
+            return data.get(
+                "detail",
+                "Unknown API error.",
+            )
+
+        return str(data)
+
+    except Exception:
+        return response.text or "Unknown API error."
 
 
-def upload_resume_file(file):
+def refresh_candidates():
     try:
-        files = {"file": (file.name, file.getvalue(), file.type)}
-        res = requests.post(f"{BACKEND_URL}/resumes/upload", files=files, timeout=10)
-        return res.status_code == 201
-    except requests.exceptions.RequestException:
-        return False
 
-
-def delete_resume_key(key):
-    try:
-        res = requests.delete(
-            f"{BACKEND_URL}/resumes", params={"s3_key": key}, timeout=5
+        response = requests.get(
+            f"{API_URL}/resumes",
+            timeout=30,
         )
-        return res.status_code == 200
-    except requests.exceptions.RequestException:
-        return False
 
+        if response.ok:
+            st.session_state.candidates = (
+                response.json()
+            )
 
-def send_chat_prompt(prompt, job_desc):
-    try:
-        res = requests.post(
-            f"{BACKEND_URL}/chat",
-            json={"prompt": prompt, "job_description": job_desc},
-            timeout=10,
+        else:
+            st.error(
+                f"Failed to load resumes: "
+                f"{api_error(response)}"
+            )
+
+    except requests.RequestException as error:
+
+        st.error(
+            f"Backend connection failed: {error}"
         )
-        if res.status_code == 200:
-            return res.json().get("response")
-    except requests.exceptions.RequestException:
-        pass
-    return "Error generating response."
 
 
 # ============================================================
-# Layout & Render
+# Header
 # ============================================================
-header_left, header_right = st.columns([0.82, 0.18])
 
-with header_left:
-    st.markdown('<div class="app-title">Resume Dangal</div>', unsafe_allow_html=True)
+st.markdown(
+    '<div class="main-title">🎯 Resume Dangal</div>',
+    unsafe_allow_html=True,
+)
+
+st.markdown(
+    '<div class="subtitle">'
+    "AI-Powered Hybrid Resume Screening & Ranking"
+    "</div>",
+    unsafe_allow_html=True,
+)
+
+
+# ============================================================
+# Backend status
+# ============================================================
+
+try:
+
+    health = requests.get(
+        f"{API_URL}/health",
+        timeout=5,
+    )
+
+    if health.ok:
+        st.success("Backend connected")
+
+    else:
+        st.warning("Backend is running but unhealthy.")
+
+except requests.RequestException:
+    st.error(
+        "Backend is not reachable. "
+        "Start FastAPI before using the application."
+    )
+
+
+# ============================================================
+# Sidebar
+# ============================================================
+
+with st.sidebar:
+
+    st.header("⚙️ System")
+
+    st.caption(
+        "Resume Dangal uses a hybrid ranking pipeline."
+    )
+
     st.markdown(
-        '<div class="app-subtitle">AI-powered resume screening workspace</div>',
+        """
+        **Ranking**
+
+        - 40% Deterministic
+        - 40% Semantic AI
+        - 20% LLM Evaluation
+        """
+    )
+
+    if st.button(
+        "🔄 Refresh Resumes",
+        use_container_width=True,
+    ):
+        refresh_candidates()
+        st.rerun()
+
+
+# ============================================================
+# STEP 1 — Resume Upload
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    "1️⃣ Upload Resumes"
+    "</div>",
+    unsafe_allow_html=True,
+)
+
+uploaded_files = st.file_uploader(
+    "Upload candidate resumes",
+    type=["pdf", "docx"],
+    accept_multiple_files=True,
+    help="Only PDF and DOCX resumes are supported.",
+)
+
+
+if uploaded_files:
+
+    for uploaded_file in uploaded_files:
+
+        with st.spinner(
+            f"Analyzing {uploaded_file.name}..."
+        ):
+
+            try:
+
+                response = requests.post(
+                    f"{API_URL}/resumes/upload",
+                    files={
+                        "file": (
+                            uploaded_file.name,
+                            uploaded_file.getvalue(),
+                            uploaded_file.type,
+                        )
+                    },
+                    timeout=180,
+                )
+
+                if response.ok:
+
+                    data = response.json()
+
+                    candidate = data["candidate"]
+
+                    st.success(
+                        f"✓ {uploaded_file.name} "
+                        "processed successfully."
+                    )
+
+                    # ----------------------------------------
+                    # Automatically show extracted fields
+                    # ----------------------------------------
+
+                    with st.expander(
+                        f"📄 {candidate['name']} — "
+                        f"{candidate.get('suitable_title') or 'Candidate'}",
+                        expanded=True,
+                    ):
+
+                        col1, col2 = st.columns(2)
+
+                        with col1:
+
+                            st.text_input(
+                                "Name",
+                                value=candidate["name"],
+                                key=f"name_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                            st.text_input(
+                                "Email",
+                                value=candidate.get("email") or "",
+                                key=f"email_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                            st.text_input(
+                                "Phone",
+                                value=candidate.get("phone") or "",
+                                key=f"phone_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                            st.text_input(
+                                "Location",
+                                value=candidate.get("location") or "",
+                                key=f"location_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                        with col2:
+
+                            st.text_input(
+                                "Suitable Title",
+                                value=candidate.get(
+                                    "suitable_title"
+                                ) or "",
+                                key=f"title_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                            st.number_input(
+                                "Experience (years)",
+                                value=float(
+                                    candidate.get(
+                                        "experience_years"
+                                    ) or 0
+                                ),
+                                key=f"exp_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                            st.text_area(
+                                "Technical Skills",
+                                value=", ".join(
+                                    candidate.get(
+                                        "tech_stack",
+                                        [],
+                                    )
+                                ),
+                                key=f"skills_{candidate['candidate_id']}",
+                                disabled=True,
+                            )
+
+                        st.text_area(
+                            "Profile Summary",
+                            value=candidate.get(
+                                "profile_summary"
+                            ) or "",
+                            key=f"summary_{candidate['candidate_id']}",
+                            disabled=True,
+                        )
+
+                        st.text_area(
+                            "Projects",
+                            value="\n".join(
+                                candidate.get(
+                                    "projects",
+                                    [],
+                                )
+                            ),
+                            key=f"projects_{candidate['candidate_id']}",
+                            disabled=True,
+                        )
+
+                else:
+
+                    # ----------------------------------------
+                    # IMPORTANT:
+                    # Show actual rejection reason
+                    # ----------------------------------------
+
+                    st.error(
+                        f"❌ {uploaded_file.name}: "
+                        f"{api_error(response)}"
+                    )
+
+            except requests.RequestException as error:
+
+                st.error(
+                    f"❌ Failed to process "
+                    f"{uploaded_file.name}: {error}"
+                )
+
+
+# ============================================================
+# Load existing candidates
+# ============================================================
+
+refresh_candidates()
+
+
+# ============================================================
+# Candidate summary
+# ============================================================
+
+if st.session_state.candidates:
+
+    st.markdown(
+        '<div class="section-title">'
+        "📋 Stored Candidates"
+        "</div>",
         unsafe_allow_html=True,
     )
 
-with header_right:
-    selected_theme = st.selectbox(
-        "Theme Mode",
-        ["Light", "Dark"],
-        index=0 if st.session_state.theme == "Light" else 1,
-        key="theme_selector_dropdown",
-    )
-    if selected_theme != st.session_state.theme:
-        st.session_state.theme = selected_theme
-        st.rerun()
-
-st.divider()
-
-resumes = fetch_resumes()
-S3_PREFIX = "resumes/"
-
-left, center, right = st.columns([1.2, 3.2, 1.5], gap="medium")
-
-# LEFT PANEL — UPLOAD
-with left:
-    st.subheader("📤 Upload Resume")
-    uploaded_file = st.file_uploader(
-        "Choose resume", type=["pdf", "doc", "docx"], label_visibility="collapsed"
+    st.dataframe(
+        [
+            {
+                "Name": candidate["name"],
+                "Title": candidate.get(
+                    "suitable_title"
+                ),
+                "Experience": candidate.get(
+                    "experience_years"
+                ),
+                "Skills": ", ".join(
+                    candidate.get(
+                        "tech_stack",
+                        [],
+                    )
+                ),
+            }
+            for candidate in st.session_state.candidates
+        ],
+        use_container_width=True,
+        hide_index=True,
     )
 
-    if uploaded_file:
-        st.success(f"Selected: {uploaded_file.name}")
-        st.caption(f"Size: {uploaded_file.size / 1024:.2f} KB")
 
-        if st.button("Upload Resume", type="primary", use_container_width=True):
-            with st.spinner("Uploading..."):
-                if upload_resume_file(uploaded_file):
-                    st.success("Uploaded successfully.")
-                    st.rerun()
-                else:
-                    st.error("Upload failed.")
+# ============================================================
+# STEP 2 — Job Description
+# ============================================================
 
-    st.divider()
-    st.markdown("**Supported formats:**\n\nPDF • DOC • DOCX")
+st.markdown(
+    '<div class="section-title">'
+    "2️⃣ Job Description"
+    "</div>",
+    unsafe_allow_html=True,
+)
 
-# CENTER PANEL — CHAT & JOB DESC
-with center:
-    st.subheader("🎯 Job Description")
-    job_description = st.text_area(
-        "Job Description Input",
-        placeholder="Paste job description here...",
-        height=170,
-        label_visibility="collapsed",
-    )
+jd_text = st.text_area(
+    "Paste the Job Description",
+    height=250,
+    placeholder=(
+        "Paste the complete job description here..."
+    ),
+)
 
-    st.divider()
-    st.subheader("💬 Chat Interface")
 
-    if "messages" not in st.session_state:
-        st.session_state.messages = []
+if st.button(
+    "🔍 Analyze Job Description",
+    type="primary",
+    use_container_width=True,
+):
 
-    chat_container = st.container(height=240)
-    with chat_container:
-        if not st.session_state.messages:
-            st.info("Ask something about the uploaded resumes or job description.")
-        for message in st.session_state.messages:
-            with st.chat_message(message["role"]):
-                st.write(message["content"])
+    if not jd_text.strip():
 
-    prompt = st.chat_input("Ask Resume Dangal...")
-    if prompt:
-        st.session_state.messages.append({"role": "user", "content": prompt})
-        bot_response = send_chat_prompt(prompt, job_description)
-        st.session_state.messages.append(
-            {"role": "assistant", "content": bot_response}
+        st.error(
+            "Please enter a Job Description first."
         )
-        st.rerun()
 
-# RIGHT PANEL — MANAGEMENT
-with right:
-    st.subheader("📋 All Resumes")
-    st.markdown(
-        f'<div class="resume-count">{len(resumes)}</div>', unsafe_allow_html=True
-    )
-    st.caption("Total uploaded resumes")
-    st.divider()
-
-    if not resumes:
-        st.info("No resumes uploaded yet.")
     else:
-        for idx, item in enumerate(resumes, start=1):
-            filename = item["Key"].replace(S3_PREFIX, "")
+
+        with st.spinner(
+            "Analyzing Job Description..."
+        ):
+
+            try:
+
+                response = requests.post(
+                    f"{API_URL}/jobs/analyze",
+                    json={
+                        "description": jd_text,
+                    },
+                    timeout=120,
+                )
+
+                if response.ok:
+
+                    data = response.json()
+
+                    st.session_state.job = data["job"]
+
+                    st.success(
+                        "Job Description analyzed successfully."
+                    )
+
+                else:
+
+                    st.error(
+                        api_error(response)
+                    )
+
+            except requests.RequestException as error:
+
+                st.error(
+                    f"Backend connection failed: {error}"
+                )
+
+
+# ============================================================
+# Display extracted JD
+# ============================================================
+
+if st.session_state.job:
+
+    job = st.session_state.job
+
+    st.markdown(
+        '<div class="section-title">'
+        "📋 Extracted Job Profile"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+
+        st.text_input(
+            "Job Title",
+            value=job["title"],
+            disabled=True,
+        )
+
+        st.text_area(
+            "Required Skills",
+            value=", ".join(
+                job.get(
+                    "required_skills",
+                    [],
+                )
+            ),
+            disabled=True,
+        )
+
+        st.text_area(
+            "Preferred Skills",
+            value=", ".join(
+                job.get(
+                    "preferred_skills",
+                    [],
+                )
+            ),
+            disabled=True,
+        )
+
+    with col2:
+
+        st.number_input(
+            "Required Experience",
+            value=float(
+                job.get(
+                    "experience_required"
+                ) or 0
+            ),
+            disabled=True,
+        )
+
+        st.text_area(
+            "Responsibilities",
+            value="\n".join(
+                job.get(
+                    "responsibilities",
+                    [],
+                )
+            ),
+            disabled=True,
+        )
+
+        st.text_area(
+            "Education",
+            value="\n".join(
+                job.get(
+                    "education",
+                    [],
+                )
+            ),
+            disabled=True,
+        )
+
+
+# ============================================================
+# STEP 3 — Ranking
+# ============================================================
+
+st.markdown(
+    '<div class="section-title">'
+    "3️⃣ Rank Candidates"
+    "</div>",
+    unsafe_allow_html=True,
+)
+
+
+if not st.session_state.job:
+
+    st.info(
+        "Analyze a Job Description before ranking candidates."
+    )
+
+elif not st.session_state.candidates:
+
+    st.info(
+        "Upload at least one valid resume before ranking."
+    )
+
+else:
+
+    if st.button(
+        "🚀 Rank All Candidates",
+        type="primary",
+        use_container_width=True,
+    ):
+
+        job_id = st.session_state.job["job_id"]
+
+        with st.spinner(
+            "Running hybrid AI ranking..."
+        ):
+
+            try:
+
+                response = requests.post(
+                    f"{API_URL}/jobs/{job_id}/rank",
+                    timeout=600,
+                )
+
+                if response.ok:
+
+                    st.session_state.rankings = (
+                        response.json()
+                    )
+
+                    st.success(
+                        "Ranking completed successfully."
+                    )
+
+                else:
+
+                    st.error(
+                        api_error(response)
+                    )
+
+            except requests.RequestException as error:
+
+                st.error(
+                    f"Ranking failed: {error}"
+                )
+
+
+# ============================================================
+# Results
+# ============================================================
+
+if st.session_state.rankings:
+
+    result = st.session_state.rankings
+
+    st.markdown(
+        '<div class="section-title">'
+        "🏆 Ranking Results"
+        "</div>",
+        unsafe_allow_html=True,
+    )
+
+    rankings = result.get(
+        "rankings",
+        [],
+    )
+
+    # --------------------------------------------------------
+    # Summary table
+    # --------------------------------------------------------
+
+    table = []
+
+    for candidate in rankings:
+
+        scores = candidate["scores"]
+
+        table.append(
+            {
+                "Rank": candidate["rank"],
+                "Candidate": candidate[
+                    "candidate_name"
+                ],
+                "Final Score": scores[
+                    "final_score"
+                ],
+                "Deterministic": scores[
+                    "deterministic_score"
+                ],
+                "Semantic AI": scores[
+                    "semantic_score"
+                ],
+                "LLM": scores[
+                    "llm_score"
+                ],
+                "Recommendation": candidate[
+                    "recommendation"
+                ],
+            }
+        )
+
+    st.dataframe(
+        table,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # --------------------------------------------------------
+    # Detailed results
+    # --------------------------------------------------------
+
+    st.markdown(
+        "### Candidate Analysis"
+    )
+
+    for candidate in rankings:
+
+        scores = candidate["scores"]
+
+        with st.expander(
+            f"#{candidate['rank']} "
+            f"{candidate['candidate_name']} "
+            f"— {scores['final_score']}/100"
+        ):
+
+            col1, col2, col3, col4 = st.columns(4)
+
+            with col1:
+                st.metric(
+                    "Final",
+                    f"{scores['final_score']:.1f}",
+                )
+
+            with col2:
+                st.metric(
+                    "Deterministic",
+                    f"{scores['deterministic_score']:.1f}",
+                )
+
+            with col3:
+                st.metric(
+                    "Semantic AI",
+                    f"{scores['semantic_score']:.1f}",
+                )
+
+            with col4:
+                st.metric(
+                    "LLM",
+                    f"{scores['llm_score']:.1f}",
+                )
+
             st.markdown(
-                f'<div class="resume-item"><b>{idx}. {filename}</b><br><small>{item["Size"] / 1024:.2f} KB</small></div>',
-                unsafe_allow_html=True,
+                f"**Recommendation:** "
+                f"{candidate['recommendation']}"
             )
 
-    st.divider()
-    if resumes:
-        st.markdown("**Delete Resume**")
-        resume_options = {
-            obj["Key"].replace(S3_PREFIX, ""): obj["Key"] for obj in resumes
-        }
-        selected_resume = st.selectbox(
-            "Select resume to delete",
-            options=list(resume_options.keys()),
-            label_visibility="collapsed",
-        )
+            st.markdown(
+                "#### Matched Required Skills"
+            )
 
-        if st.button("🗑️ Delete Selected", use_container_width=True):
-            if delete_resume_key(resume_options[selected_resume]):
-                st.success("Deleted successfully.")
-                st.rerun()
+            if candidate[
+                "matched_required_skills"
+            ]:
+
+                st.success(
+                    ", ".join(
+                        candidate[
+                            "matched_required_skills"
+                        ]
+                    )
+                )
+
             else:
-                st.error("Delete failed.")
+
+                st.warning(
+                    "No required skills matched."
+                )
+
+            st.markdown(
+                "#### Missing Required Skills"
+            )
+
+            if candidate[
+                "missing_required_skills"
+            ]:
+
+                st.error(
+                    ", ".join(
+                        candidate[
+                            "missing_required_skills"
+                        ]
+                    )
+                )
+
+            else:
+
+                st.success(
+                    "No required skill gaps."
+                )
+
+            llm = candidate.get(
+                "llm_evaluation"
+            )
+
+            if llm:
+
+                st.markdown(
+                    "#### 🤖 LLM Evaluation"
+                )
+
+                c1, c2, c3, c4 = st.columns(4)
+
+                with c1:
+                    st.metric(
+                        "Skill Fit",
+                        f"{llm['skill_fit']:.1f}",
+                    )
+
+                with c2:
+                    st.metric(
+                        "Experience Fit",
+                        f"{llm['experience_fit']:.1f}",
+                    )
+
+                with c3:
+                    st.metric(
+                        "Responsibility Fit",
+                        f"{llm['responsibility_fit']:.1f}",
+                    )
+
+                with c4:
+                    st.metric(
+                        "Project Fit",
+                        f"{llm['project_fit']:.1f}",
+                    )
+
+                st.markdown(
+                    "**Strengths**"
+                )
+
+                for strength in llm.get(
+                    "strengths",
+                    [],
+                ):
+                    st.write(
+                        f"✓ {strength}"
+                    )
+
+                st.markdown(
+                    "**Gaps**"
+                )
+
+                for gap in llm.get(
+                    "gaps",
+                    [],
+                ):
+                    st.write(
+                        f"• {gap}"
+                    )
+
+                st.markdown(
+                    "**Reasoning**"
+                )
+
+                st.write(
+                    llm.get(
+                        "reasoning",
+                        "",
+                    )
+                )
