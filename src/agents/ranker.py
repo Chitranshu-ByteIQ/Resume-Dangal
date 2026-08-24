@@ -1,0 +1,55 @@
+import pandas as pd
+
+
+def rank_candidates(candidate_results):
+
+    if not candidate_results:
+        return pd.DataFrame()
+
+    df = pd.DataFrame(candidate_results)
+
+    if df.empty:
+        return df
+
+    df["Final Score"] = pd.to_numeric(df["Final Score"], errors="coerce").fillna(0)
+
+    df = df.sort_values(by="Final Score", ascending=False).reset_index(drop=True)
+
+    df.insert(0, "Rank", df.index + 1)
+
+    return df
+
+
+def format_candidate_output(row):
+
+    name = str(row.get("Candidate Name", "Unknown")).replace(".pdf", "")
+
+    score = int(row.get("Final Score", 0))
+    recommendation = row.get("Recommendation", "Not Recommended")
+
+    skill_score = row.get("Skill Score", 0)
+    exp_score = row.get("Experience Score", 0)
+    proj_score = row.get("Project Score", 0)
+    edu_score = row.get("Education Score", 0)
+
+    matched = row.get("Matched Skills", [])
+    reason = row.get("Reason", "")
+
+    if isinstance(matched, str):
+        matched = [matched]
+
+    matched_text = ", ".join(matched) if matched else "None"
+
+    output = f"""
+{name}
+{score}%
+{recommendation}
+Skill Score: {skill_score}
+Experience Score: {exp_score}
+Project Score: {proj_score}
+Education Score: {edu_score}
+Matched Skills: {matched_text}
+Reason: {reason}
+""".strip()
+
+    return output
