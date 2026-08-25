@@ -22,12 +22,12 @@ from services.s3_service import (
     S3ServiceError,
 )
 
-from src.candidate import (
+from src.extractor.candidate import (
     extract_candidate,
     extract_text,
 )
 
-from src.job_description import (
+from src.extractor.job_description import (
     extract_job_description,
 )
 
