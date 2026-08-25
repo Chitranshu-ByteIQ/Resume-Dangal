@@ -12,6 +12,8 @@ from fastapi import (
     HTTPException,
     UploadFile,
 )
+from pydantic import BaseModel
+from pydantic import ValidationError
 from pypdf import PdfReader
 from pypdf.errors import PdfReadError
 
@@ -22,14 +24,18 @@ from services.s3_service import (
     S3ServiceError,
 )
 
-from src.candidate import (
+from src.extractor.candidate import (
+    CandidateProfile,
     extract_candidate,
     extract_text,
 )
 
-from src.job_description import (
+from src.extractor.job_description import (
+    JobDescriptionProfile,
     extract_job_description,
 )
+
+from Ranker.ranker import rank_candidates
 
 
 # ============================================================
@@ -50,6 +56,15 @@ s3 = S3Service()
 # ============================================================
 
 MAX_JD_CHARS = 30000
+
+
+# ============================================================
+# REQUEST MODELS
+# ============================================================
+
+class RankingRequest(BaseModel):
+    job_description: JobDescriptionProfile
+    candidate_ids: list[str]
 
 
 # ============================================================
@@ -615,6 +630,219 @@ def extract_job(
     return build_job_description_response(
         jd_text
     )
+
+
+# ============================================================
+# RANK CANDIDATES
+# ============================================================
+
+def validate_ranking_request(
+    payload: RankingRequest,
+) -> list[str]:
+
+    candidate_ids = [
+        candidate_id.strip()
+        for candidate_id in payload.candidate_ids
+        if candidate_id and candidate_id.strip()
+    ]
+
+    if not candidate_ids:
+
+        raise HTTPException(
+            status_code=400,
+            detail="At least one candidate_id is required.",
+        )
+
+    duplicate_ids = sorted(
+        {
+            candidate_id
+            for candidate_id in candidate_ids
+            if candidate_ids.count(candidate_id) > 1
+        }
+    )
+
+    if duplicate_ids:
+
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "message": "Duplicate candidate IDs are not allowed.",
+                "duplicate_candidate_ids": duplicate_ids,
+            },
+        )
+
+    jd = payload.job_description
+
+    has_meaningful_jd = any(
+        [
+            jd.required_skills,
+            jd.preferred_skills,
+            jd.responsibilities,
+            (
+                jd.experience_requirements
+                and jd.experience_requirements.strip()
+            ),
+            (
+                jd.education_requirements
+                and jd.education_requirements.strip()
+            ),
+        ]
+    )
+
+    if not has_meaningful_jd:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Job description must include at least one "
+                "required skill, preferred skill, responsibility, "
+                "experience requirement, or education requirement."
+            ),
+        )
+
+    return candidate_ids
+
+
+def fetch_candidate_profiles(
+    candidate_ids: list[str],
+) -> list[CandidateProfile]:
+
+    candidates = []
+    missing_candidate_ids = []
+
+    for candidate_id in candidate_ids:
+
+        profile_key = (
+            f"candidates/"
+            f"{candidate_id}/"
+            f"profile.json"
+        )
+
+        try:
+
+            profile = s3.get_json(
+                profile_key
+            )
+
+        except S3ObjectNotFound:
+
+            missing_candidate_ids.append(
+                candidate_id
+            )
+            continue
+
+        profile["candidate_id"] = (
+            profile.get(
+                "candidate_id"
+            )
+            or candidate_id
+        )
+
+        try:
+
+            candidates.append(
+                CandidateProfile(
+                    **profile
+                )
+            )
+
+        except ValidationError as error:
+
+            raise HTTPException(
+                status_code=500,
+                detail=(
+                    "Stored candidate profile is invalid "
+                    f"for candidate_id {candidate_id}: {error}"
+                ),
+            ) from error
+
+    if missing_candidate_ids:
+
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "message": "One or more candidates were not found.",
+                "missing_candidate_ids": missing_candidate_ids,
+            },
+        )
+
+    return candidates
+
+
+@app.post(
+    "/rank",
+    summary="Rank Candidates Against Job Description",
+    description=(
+        "Provide one structured JobDescriptionProfile and one "
+        "or more candidate IDs. Candidate profiles are loaded "
+        "from S3 and ranked by Ranker using match_score."
+    ),
+)
+def rank(
+    payload: RankingRequest,
+):
+
+    candidate_ids = validate_ranking_request(
+        payload
+    )
+
+    try:
+
+        candidates = fetch_candidate_profiles(
+            candidate_ids
+        )
+
+        ranking_result = rank_candidates(
+            candidates,
+            payload.job_description,
+        )
+
+    except HTTPException:
+
+        raise
+
+    except S3InvalidJSON as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        ) from error
+
+    except S3ServiceError as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        ) from error
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail="Ranking failed.",
+        ) from error
+
+    result = ranking_result.model_dump()
+
+    return {
+        "success": True,
+        "job": {
+            "job_title": payload.job_description.job_title,
+            "jd_score": payload.job_description.jd_score,
+        },
+        "total_candidates": result.get(
+            "total_candidates",
+            len(candidates),
+        ),
+        "rankings": result.get(
+            "rankings",
+            [],
+        ),
+        "evaluations": result.get(
+            "evaluations",
+            [],
+        ),
+    }
 
 
 @app.post(
