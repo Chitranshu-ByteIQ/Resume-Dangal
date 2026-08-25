@@ -1,4 +1,4 @@
-# s3_service.py
+# services/s3_service.py
 
 from __future__ import annotations
 
@@ -15,24 +15,37 @@ from dotenv import load_dotenv
 load_dotenv(override=True)
 
 
+# ============================================================
+# S3 EXCEPTIONS
+# ============================================================
+
 class S3ServiceError(RuntimeError):
-    pass
+    """Base S3 service error."""
 
 
 class S3ObjectNotFound(S3ServiceError):
-    pass
+    """Raised when an S3 object does not exist."""
 
 
 class S3InvalidJSON(S3ServiceError):
-    pass
+    """Raised when an S3 object contains invalid JSON."""
 
+
+# ============================================================
+# S3 SERVICE
+# ============================================================
 
 class S3Service:
 
     def __init__(self):
 
-        self.region = os.getenv("AWS_REGION")
-        self.bucket = os.getenv("AWS_S3_BUCKET")
+        self.region = os.getenv(
+            "AWS_REGION"
+        )
+
+        self.bucket = os.getenv(
+            "AWS_S3_BUCKET"
+        )
 
         if not self.region:
             raise ValueError(
@@ -92,17 +105,31 @@ class S3Service:
         key: str,
     ) -> str:
 
-        body = json.dumps(
-            data,
-            ensure_ascii=False,
-            default=str,
-        ).encode("utf-8")
+        try:
 
-        return self.upload(
-            BytesIO(body),
-            key,
-            "application/json",
-        )
+            body = json.dumps(
+                data,
+                ensure_ascii=False,
+                default=str,
+            ).encode("utf-8")
+
+            return self.upload(
+                BytesIO(body),
+                key,
+                "application/json",
+            )
+
+        except S3ServiceError:
+            raise
+
+        except (
+            TypeError,
+            ValueError,
+        ) as error:
+
+            raise S3ServiceError(
+                f"Failed to serialize JSON: {error}"
+            ) from error
 
     # ========================================================
     # GET JSON
@@ -120,34 +147,55 @@ class S3Service:
                 Key=key,
             )
 
-            content = response["Body"].read()
+            content = response[
+                "Body"
+            ].read()
 
-            return json.loads(
+            data = json.loads(
                 content.decode("utf-8")
             )
+
+            if not isinstance(
+                data,
+                dict,
+            ):
+
+                raise S3InvalidJSON(
+                    f"S3 object is not a JSON object: {key}"
+                )
+
+            return data
 
         except ClientError as error:
 
             if self._is_not_found(error):
-                raise S3ObjectNotFound(key) from error
+
+                raise S3ObjectNotFound(
+                    f"S3 object not found: {key}"
+                ) from error
 
             raise S3ServiceError(
                 f"S3 read failed: {error}"
             ) from error
 
-        except (
-            BotoCoreError,
-            UnicodeDecodeError,
-        ) as error:
-
-            raise S3ServiceError(
-                f"Failed to read S3 JSON: {error}"
-            ) from error
-
         except json.JSONDecodeError as error:
 
             raise S3InvalidJSON(
-                f"Invalid JSON in S3 object {key}: {error}"
+                f"Invalid JSON in S3 object "
+                f"{key}: {error}"
+            ) from error
+
+        except UnicodeDecodeError as error:
+
+            raise S3InvalidJSON(
+                f"S3 object is not valid UTF-8: "
+                f"{key}"
+            ) from error
+
+        except BotoCoreError as error:
+
+            raise S3ServiceError(
+                f"S3 read failed: {error}"
             ) from error
 
     # ========================================================
@@ -161,10 +209,14 @@ class S3Service:
 
         try:
 
-            objects = []
+            objects: list[
+                dict[str, Any]
+            ] = []
 
-            paginator = self.s3.get_paginator(
-                "list_objects_v2"
+            paginator = (
+                self.s3.get_paginator(
+                    "list_objects_v2"
+                )
             )
 
             for page in paginator.paginate(
@@ -173,22 +225,28 @@ class S3Service:
             ):
 
                 objects.extend(
-                    page.get("Contents", [])
+                    page.get(
+                        "Contents",
+                        [],
+                    )
                 )
 
             return objects
 
-        except (
-            ClientError,
-            BotoCoreError,
-        ) as error:
+        except ClientError as error:
+
+            raise S3ServiceError(
+                f"S3 list failed: {error}"
+            ) from error
+
+        except BotoCoreError as error:
 
             raise S3ServiceError(
                 f"S3 list failed: {error}"
             ) from error
 
     # ========================================================
-    # EXISTS
+    # CHECK EXISTS
     # ========================================================
 
     def exists(
@@ -208,6 +266,7 @@ class S3Service:
         except ClientError as error:
 
             if self._is_not_found(error):
+
                 return False
 
             raise S3ServiceError(
@@ -236,10 +295,13 @@ class S3Service:
                 Key=key,
             )
 
-        except (
-            ClientError,
-            BotoCoreError,
-        ) as error:
+        except ClientError as error:
+
+            raise S3ServiceError(
+                f"S3 delete failed: {error}"
+            ) from error
+
+        except BotoCoreError as error:
 
             raise S3ServiceError(
                 f"S3 delete failed: {error}"
@@ -266,17 +328,22 @@ class S3Service:
                 ExpiresIn=expires,
             )
 
-        except (
-            ClientError,
-            BotoCoreError,
-        ) as error:
+        except ClientError as error:
 
             raise S3ServiceError(
-                f"Failed to create download URL: {error}"
+                f"Failed to create download URL: "
+                f"{error}"
+            ) from error
+
+        except BotoCoreError as error:
+
+            raise S3ServiceError(
+                f"Failed to create download URL: "
+                f"{error}"
             ) from error
 
     # ========================================================
-    # HELPERS
+    # HELPER
     # ========================================================
 
     @staticmethod

@@ -6,10 +6,20 @@ import uuid
 from io import BytesIO
 
 from fastapi import (
+    Body,
     FastAPI,
     File,
     HTTPException,
     UploadFile,
+)
+from pypdf import PdfReader
+from pypdf.errors import PdfReadError
+
+from services.s3_service import (
+    S3InvalidJSON,
+    S3ObjectNotFound,
+    S3Service,
+    S3ServiceError,
 )
 
 from src.candidate import (
@@ -17,10 +27,9 @@ from src.candidate import (
     extract_text,
 )
 
-from services.s3_service import S3Service
-from services.s3_service import S3InvalidJSON
-from services.s3_service import S3ObjectNotFound
-from services.s3_service import S3ServiceError
+from src.job_description import (
+    extract_job_description,
+)
 
 
 # ============================================================
@@ -35,6 +44,17 @@ app = FastAPI(
 
 s3 = S3Service()
 
+
+# ============================================================
+# CONSTANTS
+# ============================================================
+
+MAX_JD_CHARS = 30000
+
+
+# ============================================================
+# CANDIDATE RESPONSE
+# ============================================================
 
 def candidate_response(
     profile: dict,
@@ -51,7 +71,6 @@ def candidate_response(
     )
 
     return {
-
         "candidate_id": candidate_id,
 
         "name": profile.get(
@@ -106,7 +125,7 @@ def health():
 
 
 # ============================================================
-# UPLOAD
+# UPLOAD RESUME
 # ============================================================
 
 @app.post(
@@ -179,7 +198,10 @@ async def upload_resume(
 
             raise HTTPException(
                 status_code=422,
-                detail="Could not extract text from PDF.",
+                detail=(
+                    "Could not extract text "
+                    "from PDF."
+                ),
             )
 
         # ----------------------------------------------------
@@ -192,7 +214,7 @@ async def upload_resume(
         )
 
         # ----------------------------------------------------
-        # Store profile
+        # Store candidate profile
         # ----------------------------------------------------
 
         profile_key = (
@@ -215,7 +237,6 @@ async def upload_resume(
         )
 
         return {
-
             "success": True,
 
             "candidate": profile.model_dump(),
@@ -227,7 +248,6 @@ async def upload_resume(
         }
 
     except HTTPException:
-
         raise
 
     except S3ServiceError as error:
@@ -246,6 +266,10 @@ async def upload_resume(
 def list_candidates():
 
     try:
+
+        # ----------------------------------------------------
+        # Profiles are the source of truth
+        # ----------------------------------------------------
 
         profiles = s3.list_objects(
             "candidates/"
@@ -285,14 +309,13 @@ def list_candidates():
 
                 continue
 
+            # Backend controls candidate ID
             profile["candidate_id"] = (
-                profile.get("candidate_id")
+                profile.get(
+                    "candidate_id"
+                )
                 or candidate_id
             )
-
-            # ------------------------------------------------
-            # Candidate
-            # ------------------------------------------------
 
             candidates.append(
                 candidate_response(
@@ -305,8 +328,8 @@ def list_candidates():
         # ----------------------------------------------------
 
         candidates.sort(
-            key=lambda x: (
-                x.get(
+            key=lambda candidate: (
+                candidate.get(
                     "resume_score"
                 )
                 or 0
@@ -315,11 +338,9 @@ def list_candidates():
         )
 
         return {
-
             "count": len(
                 candidates
             ),
-
             "candidates": candidates,
         }
 
@@ -362,7 +383,9 @@ def get_candidate(
         )
 
         profile["candidate_id"] = (
-            profile.get("candidate_id")
+            profile.get(
+                "candidate_id"
+            )
             or candidate_id
         )
 
@@ -420,6 +443,10 @@ def delete_candidate(
 
     try:
 
+        # ----------------------------------------------------
+        # Check candidate exists
+        # ----------------------------------------------------
+
         if not s3.exists(
             profile_key
         ):
@@ -432,25 +459,29 @@ def delete_candidate(
                 ),
             )
 
+        # ----------------------------------------------------
+        # Delete resume
+        # ----------------------------------------------------
+
         s3.delete(
             resume_key
         )
+
+        # ----------------------------------------------------
+        # Delete profile
+        # ----------------------------------------------------
 
         s3.delete(
             profile_key
         )
 
         return {
-
             "success": True,
-
             "candidate_id": candidate_id,
-
             "deleted": True,
         }
 
     except HTTPException:
-
         raise
 
     except S3ServiceError as error:
@@ -459,3 +490,202 @@ def delete_candidate(
             status_code=500,
             detail=str(error),
         ) from error
+
+
+# ============================================================
+# EXTRACT JOB DESCRIPTION
+# ============================================================
+
+def validate_jd_text(
+    jd_text: str,
+) -> str:
+
+    jd_text = jd_text.strip()
+
+    if not jd_text:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Job description is empty.",
+        )
+
+    if len(jd_text) > MAX_JD_CHARS:
+
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                "Job description exceeds "
+                f"{MAX_JD_CHARS} characters."
+            ),
+        )
+
+    return jd_text
+
+
+def extract_jd_pdf_text(
+    file_bytes: bytes,
+) -> str:
+
+    try:
+
+        reader = PdfReader(
+            BytesIO(file_bytes)
+        )
+
+        pages = []
+
+        for page in reader.pages:
+
+            text = page.extract_text() or ""
+
+            if text.strip():
+
+                pages.append(
+                    text.strip()
+                )
+
+        return "\n\n".join(
+            pages
+        )
+
+    except PdfReadError as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail="Malformed PDF file.",
+        ) from error
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Could not read PDF file."
+            ),
+        ) from error
+
+
+def build_job_description_response(
+    jd_text: str,
+) -> dict:
+
+    jd_text = validate_jd_text(
+        jd_text
+    )
+
+    try:
+
+        jd_profile = extract_job_description(
+            jd_text
+        )
+
+    except Exception as error:
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(error),
+        ) from error
+
+    return {
+        "success": True,
+        "job_description": (
+            jd_profile.model_dump()
+        ),
+    }
+
+
+@app.post(
+    "/jobs/extract",
+    summary="Paste Job Description",
+    description=(
+        "Paste a raw multiline job description as text/plain. "
+        "Do not wrap it in JSON and do not escape newlines."
+    ),
+)
+def extract_job(
+    jd_text: str = Body(
+        ...,
+        media_type="text/plain",
+        description=(
+            "Raw multiline job description text."
+        ),
+    )
+):
+
+    return build_job_description_response(
+        jd_text
+    )
+
+
+@app.post(
+    "/jobs/extract/text",
+    summary="Paste Job Description",
+    description=(
+        "Paste a raw multiline job description as text/plain. "
+        "Use this endpoint from Swagger when you want text input."
+    ),
+)
+def extract_job_text(
+    jd_text: str = Body(
+        ...,
+        media_type="text/plain",
+        description=(
+            "Raw multiline job description text."
+        ),
+    )
+):
+
+    return build_job_description_response(
+        jd_text
+    )
+
+
+@app.post(
+    "/jobs/extract/pdf",
+    summary="Upload Job Description PDF",
+    description=(
+        "Upload a PDF job description. The API extracts text "
+        "with pypdf and then uses the same LLM extraction path "
+        "as pasted text."
+    ),
+)
+async def extract_job_pdf(
+    file: UploadFile = File(
+        ...,
+        description="Job description PDF file.",
+    )
+):
+
+    if file.content_type != "application/pdf":
+
+        raise HTTPException(
+            status_code=400,
+            detail="Only PDF files are supported.",
+        )
+
+    file_bytes = await file.read()
+
+    if not file_bytes:
+
+        raise HTTPException(
+            status_code=400,
+            detail="PDF file is empty.",
+        )
+
+    jd_text = extract_jd_pdf_text(
+        file_bytes
+    )
+
+    if not jd_text.strip():
+
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "Could not extract text "
+                "from PDF."
+            ),
+        )
+
+    return build_job_description_response(
+        jd_text
+    )
