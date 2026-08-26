@@ -1,283 +1,440 @@
 # 🏆 Resume Dangal
 
-**AI-Powered Resume Ranking & Candidate Intelligence System**
+### AI-Powered Resume Intelligence & Candidate Ranking Platform
 
-Resume Dangal is an AI-powered resume screening and ranking system that evaluates multiple candidates against a given Job Description (JD). It combines deterministic scoring with LLM-based semantic analysis to produce explainable candidate rankings.
+Resume Dangal is an AI-powered recruitment intelligence platform designed to automate **resume parsing, job-description analysis, candidate evaluation, and resume ranking**.
 
-The system is designed around a **FastAPI backend, Streamlit frontend, AWS S3 resume storage, and LangGraph-based AI ranking pipeline**.
+The system converts unstructured resumes and job descriptions into structured data using LLMs, evaluates candidate-to-job compatibility using a weighted scoring engine, and produces **ranked and explainable candidate recommendations**.
+
+It combines:
+
+* 🤖 LLM-powered information extraction
+* 📄 PDF resume processing
+* 🎯 Candidate-to-JD matching
+* 📊 Weighted candidate scoring
+* 🔍 Explainable evaluations
+* ☁️ AWS S3 document storage
+* ⚡ FastAPI backend
+* 🖥️ Streamlit frontend
+* 🧩 Pydantic structured schemas
 
 ---
 
-## 🚀 Features
+## 🚀 Core Features
 
-### 📄 Resume Management
+### 📄 Resume Intelligence
 
 * Upload PDF resumes
+* Extract text from resumes
+* Automatically generate candidate profiles
+* Extract:
+
+  * Candidate name
+  * Skills
+  * Experience
+  * Projects
+  * Education
+  * Summary
+* Generate an overall resume quality score
 * Store resumes securely in AWS S3
-* Automatically generate a unique ID for every resume
-* Retrieve all previously uploaded resumes
-* Select existing resumes for evaluation
-* Delete resumes
-* Prevent duplicate filename overwrites
-* Validate file type and file size
+* Store structured candidate profiles as JSON
+* Generate temporary presigned resume URLs
+* Retrieve candidate profiles
+* Delete candidate data
 
-### 🎯 AI Resume Ranking
+---
 
-Compare multiple resumes against a Job Description.
+### 💼 Job Description Intelligence
+
+Resume Dangal converts raw job descriptions into structured data.
+
+The system extracts:
+
+* Job title
+* Job summary
+* Required skills
+* Preferred skills
+* Experience requirements
+* Education requirements
+* Responsibilities
+* JD quality score
+
+This structured representation becomes the foundation for candidate matching.
+
+---
+
+### 🎯 AI Candidate Ranking
+
+Multiple candidates can be evaluated against a single Job Description.
 
 The ranking engine evaluates:
 
-* **Skills**
-* **Project relevance**
-* **Professional experience**
-* **Education**
-* **Overall JD alignment**
+* Required skills
+* Preferred skills
+* Professional experience
+* Project relevance
+* Responsibility alignment
+* Education
 
-The scoring system prioritizes:
-
-| Factor     | Weight |
-| ---------- | -----: |
-| Skills     |    40% |
-| Projects   |    30% |
-| Experience |    20% |
-| Education  |    10% |
-
-### 🧠 Explainable AI
-
-The system does not simply return a score.
-
-It provides:
-
-* Final score
-* Candidate rank
-* Recommendation
-* Matched skills
-* Skill score
-* Project score
-* Experience score
-* Education score
-* Reason for recommendation
-
-### ⚡ Production-Oriented Architecture
-
-* FastAPI REST API
-* Streamlit UI
-* AWS S3 storage
-* LangGraph workflow
-* Pydantic structured outputs
-* Deterministic scoring where possible
-* LLM semantic evaluation where required
-* Logging and error handling
+Candidates are then sorted according to their final match score.
 
 ---
 
-# 🏗️ System Architecture
+### 🔍 Explainable Candidate Evaluation
+
+Instead of returning only a numerical score, Resume Dangal provides detailed evaluation information.
+
+Each candidate can receive:
+
+* Overall match score
+* Required skill score
+* Preferred skill score
+* Experience score
+* Project score
+* Responsibility score
+* Education score
+* Matched skill assessments
+* Strengths
+* Skill gaps
+* Recommendation
+
+This makes the ranking more transparent and useful for recruiters.
+
+---
+
+# 🧠 System Architecture
 
 ```text
-                         ┌─────────────────────┐
+                         ┌──────────────────────┐
                          │     Streamlit UI     │
-                         │      Frontend        │
-                         └──────────┬──────────┘
+                         │       app.py         │
+                         └──────────┬───────────┘
                                     │
-                              HTTP / REST
+                                  HTTP
                                     │
                                     ▼
-                         ┌─────────────────────┐
-                         │       FastAPI       │
-                         │       main.py       │
-                         └──────────┬──────────┘
+                         ┌──────────────────────┐
+                         │       FastAPI        │
+                         │       main.py        │
+                         └──────────┬───────────┘
                                     │
-                ┌───────────────────┼───────────────────┐
-                │                   │                   │
-                ▼                   ▼                   ▼
-        ┌──────────────┐    ┌──────────────┐    ┌──────────────┐
-        │     Upload   │    │    Resume    │    │   Ranking    │
-        │    / List    │    │   Retrieval  │    │    Engine    │
-        │   / Delete   │    │              │    │              │
-        └──────┬───────┘    └──────┬───────┘    └──────┬───────┘
-               │                   │                   │
-               └───────────────────┼───────────────────┘
-                                   ▼
-                           ┌──────────────┐
-                           │   AWS S3     │
-                           │    Storage   │
-                           └──────────────┘
-                                                      
-                                                       ▼
-                                             ┌──────────────────┐
-                                             │    LangGraph     │
-                                             │     Workflow     │
-                                             └────────┬─────────┘
-                                                      │
-                             ┌────────────────────────┼──────────────────────┐
-                             ▼                        ▼                      ▼
-                       ┌───────────┐           ┌───────────┐          ┌───────────┐
-                       │  Resume   │           │     JD    │          │ Candidate │
-                       │  Parser   │           │  Analyzer │          │  Scorer   │
-                       └───────────┘           └───────────┘          └─────┬─────┘
-                                                                            │
-                                                                            ▼
-                                                                     ┌────────────┐
-                                                                     │   Ranker   │
-                                                                     └─────┬──────┘
-                                                                           │
-                                                                           ▼
-                                                                     Ranked Results
+               ┌────────────────────┼────────────────────┐
+               │                    │                    │
+               ▼                    ▼                    ▼
+       ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+       │ Resume        │    │ Job           │    │ Candidate     │
+       │ Extraction    │    │ Description   │    │ Ranking       │
+       │ Pipeline      │    │ Extraction    │    │ Engine        │
+       └───────┬───────┘    └───────┬───────┘    └───────┬───────┘
+               │                    │                    │
+               ▼                    ▼                    ▼
+       ┌───────────────┐    ┌───────────────┐    ┌───────────────┐
+       │ Candidate     │    │ Job           │    │ LLM Semantic  │
+       │ Profile       │    │ Description   │    │ Evaluation    │
+       │ Schema        │    │ Schema        │    │               │
+       └───────────────┘    └───────────────┘    └───────┬───────┘
+                                                         │
+                                                         ▼
+                                                ┌─────────────────┐
+                                                │ Weighted Score  │
+                                                │ Calculation     │
+                                                └────────┬────────┘
+                                                         │
+                                                         ▼
+                                                ┌─────────────────┐
+                                                │ Ranked          │
+                                                │ Candidates      │
+                                                └─────────────────┘
+
+                              AWS S3
+                                ▲
+                                │
+                    ┌───────────┴───────────┐
+                    │                       │
+                 Resume PDF            Profile JSON
 ```
 
 ---
 
-# 🔄 Ranking Pipeline
-
-The ranking engine follows a multi-stage pipeline:
+# 🔄 End-to-End Workflow
 
 ```text
-Job Description
-       │
-       ▼
-JD Analysis
-       │
-       ├── Required Skills
-       ├── Preferred Skills
-       ├── Required Experience
-       └── Education Requirements
-       
-Resume PDFs
-       │
-       ▼
+Resume PDF
+    │
+    ▼
 PDF Text Extraction
-       │
-       ▼
-Resume Parsing
-       │
-       ├── Skills
-       ├── Experience
-       ├── Education
-       └── Projects
-       
-       ▼
-Candidate Scoring
-       │
-       ├── Skill Matching
-       ├── Project Relevance
-       ├── Experience
-       └── Education
-       
-       ▼
-Final Score
-       │
-       ▼
+    │
+    ▼
+LLM Candidate Extraction
+    │
+    ▼
+CandidateProfile
+    │
+    ├── Skills
+    ├── Experience
+    ├── Projects
+    ├── Education
+    └── Resume Score
+    │
+    ▼
+AWS S3
+    │
+    │
+    │
+Job Description
+    │
+    ▼
+LLM JD Extraction
+    │
+    ▼
+JobDescriptionProfile
+    │
+    ├── Required Skills
+    ├── Preferred Skills
+    ├── Experience
+    ├── Education
+    └── Responsibilities
+    │
+    ▼
+Candidate Evaluation
+    │
+    ├── Required Skills
+    ├── Preferred Skills
+    ├── Experience
+    ├── Projects
+    ├── Responsibilities
+    └── Education
+    │
+    ▼
+Weighted Match Score
+    │
+    ▼
 Candidate Ranking
+    │
+    ▼
+Explainable Results
 ```
 
 ---
 
-# 🧮 Scoring Methodology
+# 🧮 Ranking Methodology
 
 Resume Dangal uses a weighted scoring system.
 
-## Skills — 40%
+| Evaluation Factor |   Weight |
+| ----------------- | -------: |
+| Required Skills   |  **40%** |
+| Experience        |  **20%** |
+| Projects          |  **15%** |
+| Preferred Skills  |  **10%** |
+| Responsibilities  |  **10%** |
+| Education         |   **5%** |
+| **Total**         | **100%** |
 
-Skills have the highest weight because technical and professional competencies are usually the strongest indicators of JD alignment.
+The scoring logic is implemented in the ranking engine rather than relying entirely on the LLM for arithmetic.
 
-The system uses two stages:
+---
 
-### 1. Deterministic matching
+## 🛠️ Required Skill Evaluation
 
-Required skills are searched across the entire resume text.
+Required skills are treated as the most important part of candidate matching.
 
-This prevents the system from missing skills that appear inside:
+Each required skill can receive one of four statuses:
 
-* Project descriptions
-* Work experience
-* Certifications
-* Summary
-* Skills section
-
-### 2. Semantic matching
-
-An LLM evaluates skills that may be conceptually equivalent even when the exact keyword is absent.
+| Status    | Credit |
+| --------- | -----: |
+| `EXACT`   |   100% |
+| `RELATED` |    75% |
+| `PARTIAL` |    50% |
+| `MISSING` |     0% |
 
 For example:
 
 ```text
-JD:
+Job Description:
+
+Required Skill:
 "Retrieval-Augmented Generation"
 
-Resume:
-"FAISS, vector embeddings, ChromaDB"
+Candidate:
+
+"FAISS"
+"Vector Embeddings"
+"ChromaDB"
+"Semantic Search"
 ```
 
-The semantic layer can identify the relationship while requiring evidence from the resume.
+The semantic evaluation layer can identify related evidence while still requiring the candidate profile to contain supporting information.
 
 ---
 
-## Projects — 30%
+## 🛡️ Required Skill Score Protection
 
-Projects are evaluated based on:
+The system also applies a score cap based on required-skill coverage.
 
-* Technical relevance
-* Technologies used
-* Problem similarity
-* Methods implemented
-* Relationship to the JD
-
-A project title alone is not considered sufficient evidence.
-
----
-
-## Experience — 20%
-
-Professional experience is calculated using actual experience duration.
-
-Internships count as professional experience.
-
-Academic projects and coursework do not count as professional experience.
-
-Experience scoring is calculated deterministically rather than asking the LLM to perform arithmetic.
-
----
-
-## Education — 10%
-
-Education considers:
-
-* Degree level
-* Field of study
-* Relevance to the role
-* JD education requirements
-
----
-
-# 📊 Example Result
+This prevents a candidate from receiving an artificially high final score when critical required skills are missing.
 
 ```text
-Rank: 1
-
-Candidate: Rahul Sharma
-
-Final Score: 91%
-
-Recommendation: Strongly Recommended
-
-Skill Score: 96
-Project Score: 92
-Experience Score: 85
-Education Score: 90
-
-Matched Skills:
-Python
-FastAPI
-Docker
-AWS
-Kubernetes
-LangChain
-LangGraph
-
-Reason:
-Candidate demonstrates strong alignment with the required
-technical stack and relevant project experience.
+Required Skill Coverage
+        │
+        ├── 0%              → Maximum score: 45
+        ├── <25%            → Maximum score: 55
+        ├── <50%            → Maximum score: 70
+        ├── <75%            → Maximum score: 82
+        └── ≥75%            → Maximum score: 100
 ```
+
+This makes the ranking system more aligned with real recruitment requirements.
+
+---
+
+# 🧠 LLM Architecture
+
+The project uses **Groq-hosted LLMs through LangChain**.
+
+The LLM is primarily responsible for:
+
+* Understanding unstructured resume content
+* Extracting structured candidate information
+* Understanding job descriptions
+* Identifying semantic relationships between candidate evidence and JD requirements
+* Generating strengths and gaps
+* Producing structured evaluation outputs
+
+The application code remains responsible for:
+
+* Validation
+* Score aggregation
+* Required-skill coverage
+* Score boundaries
+* Candidate sorting
+* S3 operations
+* API error handling
+
+This separation makes the system more predictable and easier to maintain.
+
+---
+
+# 📦 Structured Data Models
+
+## Candidate Profile
+
+```json
+{
+  "candidate_id": "uuid",
+  "name": "Candidate Name",
+  "resume_score": 88,
+  "summary": "AI Engineer with experience in...",
+  "skills": [
+    "Python",
+    "FastAPI",
+    "AWS",
+    "Docker"
+  ],
+  "experience": [],
+  "projects": [],
+  "education": []
+}
+```
+
+---
+
+## Job Description Profile
+
+```json
+{
+  "job_title": "AI Engineer",
+  "summary": "Looking for an AI Engineer...",
+  "required_skills": [
+    "Python",
+    "FastAPI",
+    "Machine Learning"
+  ],
+  "preferred_skills": [
+    "AWS",
+    "LangChain"
+  ],
+  "experience_requirements": "1+ years",
+  "education_requirements": "Bachelor's degree",
+  "responsibilities": [
+    "Build AI applications",
+    "Develop APIs"
+  ],
+  "jd_score": 92
+}
+```
+
+---
+
+## Candidate Evaluation
+
+```json
+{
+  "candidate_id": "candidate-001",
+  "candidate_name": "John Doe",
+  "match_score": 86.5,
+  "required_skill_score": 90,
+  "preferred_skill_score": 80,
+  "experience_score": 85,
+  "project_score": 88,
+  "responsibility_score": 84,
+  "education_score": 75,
+  "strengths": [
+    "Strong Python experience",
+    "Relevant AI projects"
+  ],
+  "gaps": [
+    "No Kubernetes evidence found"
+  ],
+  "recommendation": "Strong candidate"
+}
+```
+
+---
+
+# 📊 Recommendation System
+
+The final match score is converted into a human-readable recommendation.
+
+|      Score | Recommendation      |
+| ---------: | ------------------- |
+|   `90–100` | Excellent candidate |
+| `80–89.99` | Strong candidate    |
+| `70–79.99` | Good candidate      |
+| `60–69.99` | Moderate candidate  |
+|      `<60` | Weak candidate      |
+
+---
+
+# ☁️ AWS S3 Storage Architecture
+
+Resume Dangal uses Amazon S3 for document and profile storage.
+
+```text
+resume-dangal-storage/
+│
+├── resumes/
+│   └── <candidate_id>/
+│       └── resume.pdf
+│
+└── candidates/
+    └── <candidate_id>/
+        └── profile.json
+```
+
+### Resume
+
+```text
+resumes/<candidate_id>/resume.pdf
+```
+
+### Candidate Profile
+
+```text
+candidates/<candidate_id>/profile.json
+```
+
+The backend also generates presigned URLs for temporary resume access.
 
 ---
 
@@ -287,89 +444,62 @@ technical stack and relevant project experience.
 Resume-Dangal/
 │
 ├── main.py
-├── requirements.txt
-├── .env
-├── .gitignore
+├── app.py
 ├── README.md
+├── LICENSE
+├── .gitignore
 │
-├── Frontend/
-│   └── app.py
+├── Ranker/
+│   ├── __init__.py
+│   ├── evaluator.py
+│   ├── prompts.py
+│   ├── ranker.py
+│   └── schemas.py
 │
 ├── services/
 │   ├── __init__.py
 │   └── s3_service.py
 │
 └── src/
-    ├── __init__.py
-    │
-    ├── agents/
-    │   ├── __init__.py
-    │   ├── jd_analyzer.py
-    │   ├── matcher.py
-    │   ├── ranker.py
-    │   ├── recruiter_matcher.py
-    │   ├── resume_parser.py
-    │   ├── section_scorer.py
-    │   └── skill_gap.py
-    │
-    ├── graph/
-    │   ├── __init__.py
-    │   ├── state.py
-    │   └── workflow.py
-    │
-    ├── llm/
-    │   ├── __init__.py
-    │   └── llm_config.py
-    │
-    ├── models/
-    │   ├── __init__.py
-    │   └── schema.py
-    │
-    ├── prompts/
-    │   ├── __init__.py
-    │   └── prompts.py
-    │
-    └── utils/
+    └── extractor/
         ├── __init__.py
-        ├── file_handler.py
-        └── text_cleaner.py
+        ├── candidate.py
+        └── job_description.py
 ```
 
 ---
 
-# 🛠️ Tech Stack
+# 🛠️ Technology Stack
 
-### Backend
+## Backend
 
 * Python
 * FastAPI
-* Pydantic
 * Uvicorn
+* Pydantic
 
-### AI / ML
+## AI / LLM
 
 * LangChain
-* LangGraph
-* LLM-based structured extraction
-* Deterministic skill matching
-* Semantic skill matching
+* Groq
+* Structured LLM outputs
+* Semantic candidate evaluation
 
-### Frontend
-
-* Streamlit
-* Requests
-* Pandas
-
-### Storage
-
-* AWS S3
-* Boto3
-
-### Document Processing
+## Document Processing
 
 * PyPDF
 
-### Configuration
+## Cloud
+
+* Amazon S3
+* Boto3
+
+## Frontend
+
+* Streamlit
+* Requests
+
+## Configuration
 
 * python-dotenv
 
@@ -377,7 +507,7 @@ Resume-Dangal/
 
 # ⚙️ Installation
 
-## 1. Clone the repository
+## 1. Clone the Repository
 
 ```bash
 git clone https://github.com/Chitranshu-ByteIQ/Resume-Dangal.git
@@ -387,25 +517,49 @@ cd Resume-Dangal
 
 ---
 
-## 2. Create a Conda environment
+## 2. Create a Virtual Environment
+
+### Conda
 
 ```bash
 conda create -n resume-dangal python=3.11 -y
 ```
 
-Activate it:
+Activate:
 
 ```bash
 conda activate resume-dangal
 ```
 
----
-
-## 3. Install dependencies
+### Or using venv
 
 ```bash
-pip install -r requirements.txt
+python -m venv .venv
 ```
+
+Windows:
+
+```powershell
+.venv\Scripts\activate
+```
+
+Linux/macOS:
+
+```bash
+source .venv/bin/activate
+```
+
+---
+
+# 📦 Install Dependencies
+
+Install the core dependencies:
+
+```bash
+pip install fastapi uvicorn streamlit requests boto3 python-dotenv pypdf pydantic langchain-core langchain-groq python-multipart
+```
+
+> For production deployments, use a pinned `requirements.txt` generated and tested against your deployment environment.
 
 ---
 
@@ -414,83 +568,133 @@ pip install -r requirements.txt
 Create a `.env` file in the project root.
 
 ```env
+# ==========================================================
+# AWS
+# ==========================================================
+
 AWS_ACCESS_KEY_ID=your_aws_access_key
+
 AWS_SECRET_ACCESS_KEY=your_aws_secret_key
 
-AWS_REGION=ap-south-2
-AWS_S3_BUCKET=resume-dangal-storage
+AWS_REGION=your_aws_region
+
+AWS_S3_BUCKET=your_s3_bucket
+
+
+# ==========================================================
+# GROQ
+# ==========================================================
 
 GROQ_API_KEY=your_groq_api_key
 
-BACKEND_URL=http://127.0.0.1:8000
+GROQ_MODEL=openai/gpt-oss-120b
+
+
+# ==========================================================
+# FRONTEND
+# ==========================================================
+
+API_BASE_URL=http://127.0.0.1:8000
 ```
 
-Never commit your `.env` file.
+---
+
+# ⚠️ Security
+
+**Never commit your `.env` file.**
+
+Make sure `.gitignore` contains:
+
+```gitignore
+.env
+.env.*
+!.env.example
+```
+
+For production:
+
+* Use IAM roles instead of long-lived AWS credentials where possible.
+* Keep S3 buckets private.
+* Use least-privilege IAM policies.
+* Rotate compromised credentials immediately.
+* Never expose API keys in frontend code.
+* Never hard-code secrets into Python files.
 
 ---
 
 # ☁️ AWS S3 Setup
 
-Create an S3 bucket and configure the environment variables.
+Create an S3 bucket.
 
-The application stores resumes using the following structure:
+Example:
 
 ```text
-resume-dangal-storage/
-│
-└── resumes/
-    ├── <resume-id>_candidate1.pdf
-    ├── <resume-id>_candidate2.pdf
-    └── <resume-id>_candidate3.pdf
+resume-dangal-storage
 ```
 
-Each uploaded resume receives a unique ID.
+Configure:
 
-This prevents two candidates with the same filename from overwriting each other.
+```env
+AWS_REGION=your_region
+AWS_S3_BUCKET=resume-dangal-storage
+```
+
+The application will create logical prefixes automatically:
+
+```text
+resumes/
+candidates/
+```
+
+No manually created folders are required.
 
 ---
 
-# ▶️ Running the Application
+# ▶️ Running the Backend
 
-The system consists of two processes.
-
-## Start FastAPI
-
-From the project root:
+Start FastAPI:
 
 ```bash
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-API:
+Backend:
 
 ```text
 http://127.0.0.1:8000
 ```
 
-Swagger documentation:
+Swagger UI:
 
 ```text
 http://127.0.0.1:8000/docs
 ```
 
+ReDoc:
+
+```text
+http://127.0.0.1:8000/redoc
+```
+
 ---
 
-## Start Streamlit
+# 🖥️ Running the Frontend
 
-Open another terminal:
+Open another terminal.
+
+Activate the environment:
 
 ```bash
 conda activate resume-dangal
 ```
 
-From the project root:
+Run Streamlit:
 
 ```bash
-streamlit run Frontend/app.py
+streamlit run app.py
 ```
 
-Frontend:
+The frontend will normally be available at:
 
 ```text
 http://localhost:8501
@@ -503,40 +707,15 @@ http://localhost:8501
 ## Health
 
 ```http
-GET /health
+GET /
 ```
 
 Example:
 
 ```json
 {
-  "status": "healthy",
-  "storage": "connected"
-}
-```
-
----
-
-## List Resumes
-
-```http
-GET /api/resumes
-```
-
-Example:
-
-```json
-{
-  "count": 2,
-  "resumes": [
-    {
-      "resume_id": "8f12abc",
-      "filename": "john_resume.pdf",
-      "s3_key": "resumes/8f12abc_john_resume.pdf",
-      "size": 523421,
-      "last_modified": "2026-08-24T10:30:00+00:00"
-    }
-  ]
+  "status": "ok",
+  "message": "Resume Dangal API is running"
 }
 ```
 
@@ -545,280 +724,191 @@ Example:
 ## Upload Resume
 
 ```http
-POST /api/resumes/upload
+POST /resumes/upload
 ```
 
-Form field:
+Content type:
 
 ```text
-file
+multipart/form-data
 ```
 
-Only PDF files up to 10 MB are accepted.
+Field:
+
+```text
+file=<resume.pdf>
+```
+
+Example using cURL:
+
+```bash
+curl -X POST \
+  http://127.0.0.1:8000/resumes/upload \
+  -F "file=@resume.pdf"
+```
+
+The backend:
+
+```text
+PDF
+ ↓
+S3 Upload
+ ↓
+Text Extraction
+ ↓
+LLM Candidate Extraction
+ ↓
+CandidateProfile
+ ↓
+S3 Profile Storage
+ ↓
+API Response
+```
 
 ---
 
-## Get Resume
+# 📋 List Candidates
 
 ```http
-GET /api/resumes/{resume_id}
+GET /candidates
+```
+
+Example:
+
+```bash
+curl http://127.0.0.1:8000/candidates
+```
+
+Candidates are returned ordered by their resume score.
+
+---
+
+# 👤 Get Candidate
+
+```http
+GET /candidates/{candidate_id}
+```
+
+Example:
+
+```bash
+curl http://127.0.0.1:8000/candidates/<candidate_id>
+```
+
+Returns:
+
+* Candidate information
+* Resume score
+* Skills
+* Experience
+* Projects
+* Education
+* Temporary resume download URL
+
+---
+
+# 🗑️ Delete Candidate
+
+```http
+DELETE /candidates/{candidate_id}
+```
+
+Example:
+
+```bash
+curl -X DELETE \
+  http://127.0.0.1:8000/candidates/<candidate_id>
+```
+
+The backend removes:
+
+```text
+resumes/<candidate_id>/resume.pdf
+
+candidates/<candidate_id>/profile.json
 ```
 
 ---
 
-## Delete Resume
+# 💼 Extract Job Description
 
 ```http
-DELETE /api/resumes/{resume_id}
+POST /jobs/extract
+```
+
+Content type:
+
+```text
+text/plain
+```
+
+Example:
+
+```bash
+curl -X POST \
+  http://127.0.0.1:8000/jobs/extract \
+  -H "Content-Type: text/plain" \
+  --data "We are looking for an AI Engineer with Python, FastAPI and AWS experience."
+```
+
+The API converts the raw JD into a structured `JobDescriptionProfile`.
+
+The current backend also validates the JD length and rejects inputs exceeding:
+
+```text
+30,000 characters
 ```
 
 ---
 
-## Rank Resumes
+# 🎯 Candidate Ranking
 
-```http
-POST /api/ranking
+The ranking system accepts:
+
+```text
+JobDescriptionProfile
++
+Candidate IDs
 ```
 
-Request:
+Conceptually:
 
 ```json
 {
-  "job_description": "We are looking for an AI Engineer with Python, FastAPI, AWS and LangChain experience.",
-  "resume_ids": [
-    "8f12abc",
-    "91bd821",
-    "72ad821"
+  "job_description": {
+    "job_title": "AI Engineer",
+    "summary": "AI engineering role",
+    "required_skills": [
+      "Python",
+      "FastAPI",
+      "Machine Learning"
+    ],
+    "preferred_skills": [
+      "AWS",
+      "LangChain"
+    ],
+    "experience_requirements": "1+ years",
+    "education_requirements": "Bachelor's degree",
+    "responsibilities": [
+      "Build AI applications"
+    ],
+    "jd_score": 90
+  },
+  "candidate_ids": [
+    "candidate-001",
+    "candidate-002",
+    "candidate-003"
   ]
 }
 ```
 
-Response:
-
-```json
-{
-  "success": true,
-  "total_resumes": 3,
-  "results": [
-    {
-      "Rank": 1,
-      "Candidate Name": "john_resume.pdf",
-      "Final Score": 91,
-      "Recommendation": "Strongly Recommended"
-    }
-  ]
-}
-```
-
----
-
-# 🖥️ Frontend Workflow
-
-The Streamlit interface follows this workflow:
+The system evaluates every candidate and sorts the results by:
 
 ```text
-1. Upload resumes
-        ↓
-2. Resumes are stored in S3
-        ↓
-3. Resume Library refreshes
-        ↓
-4. Select existing resumes
-        ↓
-5. Paste Job Description
-        ↓
-6. Click "Rank Selected Resumes"
-        ↓
-7. Backend retrieves selected PDFs
-        ↓
-8. PDFs are converted to text
-        ↓
-9. LangGraph processes candidates
-        ↓
-10. Results appear in Streamlit
+match_score DESC
 ```
 
----
-
-# 🧠 Why LangGraph?
-
-LangGraph is used to represent the ranking process as a controlled workflow.
-
-```text
-START
-  │
-  ▼
-Resume Parser
-  │
-  ▼
-JD Analyzer
-  │
-  ▼
-Candidate Scorer
-  │
-  ▼
-Candidate Ranker
-  │
-  ▼
-END
-```
-
-This makes the system easier to:
-
-* Debug
-* Extend
-* Test
-* Observe
-* Add additional AI agents
-* Introduce human-in-the-loop workflows
-
----
-
-# 🛡️ Design Principles
-
-Resume Dangal follows several important engineering principles.
-
-### Deterministic where possible
-
-Arithmetic and exact keyword matching should not depend on an LLM.
-
-### LLM where semantic reasoning is required
-
-LLMs are used for:
-
-* Resume information extraction
-* Semantic skill relationships
-* Project relevance
-* Education relevance
-* Evidence-based reasoning
-
-### API-first architecture
-
-The frontend does not communicate directly with AWS S3.
-
-```text
-Streamlit
-    ↓
-FastAPI
-    ↓
-S3
-```
-
-This keeps credentials and storage logic away from the frontend.
-
-### Stable identifiers
-
-Every resume receives a unique ID.
-
-The frontend uses:
-
-```text
-resume_id
-```
-
-rather than manipulating S3 keys directly.
-
-### Explainability
-
-The system provides the reasoning behind the ranking rather than returning only a numerical score.
-
----
-
-# ⚠️ Current Limitations
-
-The current version primarily supports **text-based PDF resumes**.
-
-Scanned/image-only PDFs may require an OCR pipeline.
-
-Potential future improvements include:
-
-* OCR for scanned resumes
-* Resume preview
-* Candidate profile extraction
-* Duplicate resume detection
-* Better semantic skill ontology
-* Vector-based resume retrieval
-* Resume-to-JD similarity embeddings
-* Evaluation benchmark datasets
-* Ranking evaluation metrics such as NDCG and MRR
-* Human-in-the-loop review
-* Authentication and multi-user support
-* Persistent ranking history
-* Recruiter dashboards
-* Async/background ranking jobs
-* Docker deployment
-* CI/CD
-* Cloud deployment
-* Observability with LangSmith
-
----
-
-# 🔬 Future Evaluation Strategy
-
-For a production-quality ranking system, accuracy should not be judged only by whether an LLM "looks reasonable."
-
-The system should eventually be evaluated using a labeled dataset containing:
-
-```text
-Job Description
-        +
-Multiple Resumes
-        +
-Human Recruiter Ranking
-        ↓
-Ground Truth
-```
-
-Then evaluate:
-
-* Precision@K
-* Recall@K
-* NDCG@K
-* MRR
-* Pairwise ranking accuracy
-* Skill extraction accuracy
-* Experience extraction accuracy
-* Recommendation accuracy
-
-This allows Resume Dangal to measure whether the ranking engine actually performs well against human recruiter judgments.
-
----
-
-# 🔒 Security Considerations
-
-Before deploying publicly:
-
-* Never expose AWS credentials to Streamlit
-* Keep `.env` out of Git
-* Use IAM roles with least privilege
-* Validate uploaded files
-* Limit upload size
-* Sanitize filenames
-* Validate S3 keys server-side
-* Add authentication
-* Add rate limiting
-* Add request logging
-* Avoid exposing raw candidate data unnecessarily
-* Encrypt sensitive data at rest
-* Configure appropriate S3 bucket policies
-
----
-
-# 🧪 Development
-
-Run FastAPI:
-
-```bash
-uvicorn main:app --reload
-```
-
-Run Streamlit:
-
-```bash
-streamlit run Frontend/app.py
-```
-
-Check API documentation:
+The exact current route and request schema can always be verified through:
 
 ```text
 http://127.0.0.1:8000/docs
@@ -826,51 +916,357 @@ http://127.0.0.1:8000/docs
 
 ---
 
-# 📌 Project Goal
-
-Resume Dangal aims to move beyond simple keyword-based ATS matching.
-
-The long-term goal is to build an **evidence-based AI recruitment system** that can understand:
+# 📈 Example Ranking
 
 ```text
-Job Requirements
-       ↓
-Candidate Skills
-       ↓
-Candidate Experience
-       ↓
-Project Relevance
-       ↓
-Education
-       ↓
-Evidence
-       ↓
-Explainable Score
-       ↓
-Candidate Ranking
+==================================================
+             RESUME DANGAL RESULTS
+==================================================
+
+Job: AI Engineer
+
+--------------------------------------------------
+Rank: 1
+Candidate: Candidate A
+
+Match Score: 91.50
+
+Recommendation:
+Excellent candidate
+
+Required Skills:     95
+Experience:          88
+Projects:            92
+Preferred Skills:    80
+Responsibilities:    90
+Education:           85
+
+Strengths:
+✓ Strong Python experience
+✓ Relevant AI projects
+✓ Strong backend experience
+
+Gaps:
+• Limited Kubernetes evidence
+--------------------------------------------------
+
+Rank: 2
+Candidate: Candidate B
+
+Match Score: 78.20
+
+Recommendation:
+Good candidate
+--------------------------------------------------
 ```
 
-The objective is not simply to ask an LLM:
+---
 
-> "Which resume is better?"
+# 🔍 Explainability Example
 
-Instead, the system decomposes the decision into measurable components and uses AI only where semantic reasoning is genuinely useful.
+Instead of:
+
+```text
+Candidate Score = 82
+```
+
+Resume Dangal can provide:
+
+```text
+Candidate Score = 82
+
+Strengths:
+- Strong Python experience
+- Relevant machine learning projects
+- Good FastAPI experience
+
+Gaps:
+- Missing Kubernetes experience
+- Limited AWS production experience
+
+Recommendation:
+Strong candidate
+```
+
+This allows recruiters to understand **why** a candidate received a particular ranking.
+
+---
+
+# 🧱 Design Principles
+
+## 1. Structured LLM Outputs
+
+LLM responses are constrained through Pydantic schemas instead of relying on arbitrary text.
+
+This provides predictable application contracts.
+
+---
+
+## 2. Deterministic Score Aggregation
+
+The LLM evaluates semantic relationships, while Python performs:
+
+* Weighted scoring
+* Score normalization
+* Required-skill coverage
+* Score caps
+* Sorting
+* Deduplication
+* Recommendation generation
+
+This reduces the amount of critical business logic delegated to the model.
+
+---
+
+## 3. Separation of Responsibilities
+
+```text
+main.py
+    ↓
+API Layer
+
+src/extractor/
+    ↓
+Information Extraction
+
+Ranker/
+    ↓
+Candidate Evaluation
+
+services/
+    ↓
+AWS Infrastructure
+
+app.py
+    ↓
+Frontend
+```
+
+This makes the project easier to extend and maintain.
+
+---
+
+# 🧪 Testing Strategy
+
+Recommended test layers:
+
+```text
+                    Tests
+                      │
+        ┌─────────────┼─────────────┐
+        │             │             │
+        ▼             ▼             ▼
+     Unit Tests   Integration   API Tests
+        │             │             │
+        ▼             ▼             ▼
+    Scoring       S3 + LLM      FastAPI
+    Schemas       Pipeline      Endpoints
+    Utilities
+```
+
+Recommended test cases include:
+
+* Invalid PDF upload
+* Empty PDF
+* Corrupted PDF
+* Missing API keys
+* Missing S3 bucket
+* Invalid candidate ID
+* Duplicate candidate IDs
+* Empty JD
+* Oversized JD
+* Missing required skills
+* Candidate with no experience
+* Candidate with no projects
+* Candidate with incomplete education
+* S3 object not found
+* LLM failure
+* Invalid structured LLM output
+
+---
+
+# 🚀 Production Considerations
+
+Resume Dangal is designed with production-oriented separation of concerns, but a production deployment should additionally consider:
+
+### Security
+
+* Authentication
+* Authorization
+* IAM least privilege
+* Private S3 buckets
+* Secret management
+* Rate limiting
+
+### Reliability
+
+* LLM retry policies
+* Timeouts
+* Circuit breakers
+* Graceful degradation
+* Background processing
+* Queue-based workloads
+
+### Observability
+
+* Structured logging
+* Request IDs
+* LLM latency tracking
+* Token usage monitoring
+* Error tracking
+* Application metrics
+
+### Scalability
+
+For large resume collections:
+
+```text
+User
+ │
+ ▼
+FastAPI
+ │
+ ▼
+Message Queue
+ │
+ ├───────────────┐
+ ▼               ▼
+Resume Worker   JD Worker
+ │               │
+ └───────┬───────┘
+         ▼
+       S3
+         │
+         ▼
+ Ranking Workers
+         │
+         ▼
+   Ranking Results
+```
+
+This architecture would allow resume processing and candidate ranking to scale independently.
+
+---
+
+# 🗺️ Roadmap
+
+Future improvements may include:
+
+* [ ] Batch resume processing
+* [ ] Async resume processing
+* [ ] Background job queues
+* [ ] Authentication and authorization
+* [ ] Recruiter accounts
+* [ ] Multi-tenant architecture
+* [ ] Candidate search
+* [ ] Advanced filtering
+* [ ] Skill-gap analysis
+* [ ] Candidate comparison
+* [ ] Recruiter feedback-based score calibration
+* [ ] Evaluation caching
+* [ ] LLM observability
+* [ ] Automated ranking benchmarks
+* [ ] CI/CD pipeline
+* [ ] Docker deployment
+* [ ] Kubernetes deployment
+* [ ] Cloud-native monitoring
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome.
+
+### 1. Fork the repository
+
+```bash
+git clone https://github.com/Chitranshu-ByteIQ/Resume-Dangal.git
+```
+
+### 2. Create a feature branch
+
+```bash
+git checkout -b feature/your-feature
+```
+
+### 3. Make your changes
+
+```bash
+git add .
+```
+
+### 4. Commit
+
+```bash
+git commit -m "feat: describe your change"
+```
+
+### 5. Push
+
+```bash
+git push origin feature/your-feature
+```
+
+### 6. Open a Pull Request
+
+Please include:
+
+* What changed
+* Why the change was required
+* How it was tested
+* Any new environment variables
+* Any deployment impact
+
+---
+
+# 📜 License
+
+See the repository's [`LICENSE`](LICENSE) file for licensing information.
 
 ---
 
 # 👨‍💻 Author
 
-**Chitranshu-ByteIQ**
-
-Computer Science & Engineering — Data Science
+**Chitranshu**
 
 GitHub:
+
 https://github.com/Chitranshu-ByteIQ
+
+Project:
+
+https://github.com/Chitranshu-ByteIQ/Resume-Dangal
 
 ---
 
-# 📄 License
+# ⭐ Why Resume Dangal?
 
-This project is licensed under the MIT License.
+Resume Dangal demonstrates how modern AI engineering can combine:
 
-See `LICENSE` for more information.
+```text
+LLMs
+ +
+Structured Outputs
+ +
+PDF Processing
+ +
+Semantic Evaluation
+ +
+Deterministic Scoring
+ +
+FastAPI
+ +
+AWS S3
+ +
+Streamlit
+```
+
+to build an end-to-end **AI-powered recruitment intelligence system**.
+
+The goal is not simply to ask an LLM:
+
+> "Which candidate is better?"
+
+Instead, Resume Dangal builds a structured pipeline where candidate information, job requirements, evaluation criteria, scoring, and explanations are represented explicitly.
+
+That makes the system easier to **understand, debug, evaluate, extend, and eventually productionize**.
